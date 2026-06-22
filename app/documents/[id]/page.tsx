@@ -200,7 +200,9 @@ export default function DocumentEditorPage() {
 
         {/* Indicador de proyecto vinculado */}
         {doc.project_id && (
-          <Link2 size={14} style={{ color: 'var(--accent)', flexShrink: 0 }} title="Vinculado a un proyecto de Strata" />
+          <span title="Vinculado a un proyecto de Strata" style={{ display: 'flex', alignItems: 'center' }}>
+            <Link2 size={14} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+          </span>
         )}
       </div>
 
