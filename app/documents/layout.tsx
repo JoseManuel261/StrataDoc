@@ -2,6 +2,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import ThemeToggle from '@/components/ThemeToggle'
+import NetworkToast from '@/components/NetworkToast'
 import { FileText, Plus, LogOut } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
@@ -17,8 +18,21 @@ export default function DocumentsLayout({ children }: { children: React.ReactNod
     router.refresh()
   }
 
+  // En la página del editor el sidebar no aplica — usamos layout full
+  const isEditor = /^\/documents\/[^/]+$/.test(pathname) && pathname !== '/documents/new'
+
+  if (isEditor) {
+    return (
+      <>
+        <NetworkToast />
+        {children}
+      </>
+    )
+  }
+
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg)' }}>
+      <NetworkToast />
 
       {/* Sidebar */}
       <aside style={{
@@ -41,12 +55,7 @@ export default function DocumentsLayout({ children }: { children: React.ReactNod
           justifyContent: 'space-between',
         }}>
           <Link href="/documents" style={{ textDecoration: 'none' }}>
-            <span style={{
-              fontFamily: 'Fenix, serif',
-              fontSize: '1.1rem',
-              color: 'var(--text)',
-              letterSpacing: '-0.01em',
-            }}>
+            <span style={{ fontFamily: 'Fenix, serif', fontSize: '1.1rem', color: 'var(--text)', letterSpacing: '-0.01em' }}>
               Strata<span style={{ color: 'var(--accent)' }}>DOC</span>
             </span>
           </Link>
@@ -66,9 +75,7 @@ export default function DocumentsLayout({ children }: { children: React.ReactNod
         {/* Nuevo documento */}
         <div style={{ padding: '0.75rem', borderTop: '1px solid var(--border)' }}>
           <Link href="/documents/new" style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
+            display: 'flex', alignItems: 'center', gap: '0.5rem',
             padding: '0.625rem 0.75rem',
             borderRadius: '0.5rem',
             background: 'var(--accent)',
@@ -91,9 +98,7 @@ export default function DocumentsLayout({ children }: { children: React.ReactNod
           <button
             onClick={handleSignOut}
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
+              display: 'flex', alignItems: 'center', gap: '0.5rem',
               width: '100%',
               padding: '0.5rem 0.75rem',
               borderRadius: '0.375rem',
@@ -114,7 +119,6 @@ export default function DocumentsLayout({ children }: { children: React.ReactNod
         </div>
       </aside>
 
-      {/* Main content */}
       <main style={{ marginLeft: '220px', flex: 1, minWidth: 0 }}>
         {children}
       </main>
@@ -123,16 +127,11 @@ export default function DocumentsLayout({ children }: { children: React.ReactNod
 }
 
 function NavItem({ href, label, icon, active }: {
-  href: string
-  label: string
-  icon: React.ReactNode
-  active: boolean
+  href: string; label: string; icon: React.ReactNode; active: boolean
 }) {
   return (
     <Link href={href} style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: '0.5rem',
+      display: 'flex', alignItems: 'center', gap: '0.5rem',
       padding: '0.5rem 0.75rem',
       borderRadius: '0.375rem',
       textDecoration: 'none',
@@ -143,8 +142,7 @@ function NavItem({ href, label, icon, active }: {
       background: active ? 'var(--accent-dim)' : 'transparent',
       transition: 'all 0.15s',
     }}>
-      {icon}
-      {label}
+      {icon}{label}
     </Link>
   )
 }
