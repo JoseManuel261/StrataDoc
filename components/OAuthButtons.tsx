@@ -4,10 +4,6 @@ import { createClient } from '@/lib/supabase'
 
 type Provider = 'github' | 'google'
 
-// lucide-react quitó los íconos de marca (Github, Twitter, etc.) a partir
-// de la v1 — ver https://lucide.dev/guide/react/migration. En vez de
-// agregar una dependencia nueva solo para un ícono, se usa el SVG oficial
-// de GitHub inline.
 function GithubIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -35,9 +31,14 @@ export default function OAuthButtons() {
   async function signIn(provider: Provider) {
     setLoading(provider)
     setError('')
+
+    // Usa NEXT_PUBLIC_APP_URL en producción para que el callback nunca
+    // apunte a localhost cuando el usuario está en el deploy de Vercel.
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin
     const nextParam = new URLSearchParams(window.location.search).get('next')
-    const safeNext = nextParam && nextParam.startsWith('/') ? nextParam : null
-    const callback = `${window.location.origin}/auth/callback${safeNext ? `?next=${encodeURIComponent(safeNext)}` : ''}`
+    const safeNext = nextParam && nextParam.startsWith('/') ? nextParam : '/documents'
+    const callback = `${baseUrl}/auth/callback?next=${encodeURIComponent(safeNext)}`
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: { redirectTo: callback },
@@ -46,23 +47,37 @@ export default function OAuthButtons() {
       setError(error.message)
       setLoading(null)
     }
-    // En éxito el navegador se redirige al proveedor; no reseteamos loading.
   }
 
-  const btnCls = 'w-full flex items-center justify-center gap-2.5 py-3 rounded-lg text-sm font-medium transition-all'
-  const btnStyle = { background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text)' }
-
-  function hoverOn(e: React.MouseEvent<HTMLButtonElement>) {
-    if (!loading) (e.currentTarget as HTMLElement).style.borderColor = 'var(--accent)'
-  }
-  function hoverOff(e: React.MouseEvent<HTMLButtonElement>) {
-    (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'
+  const btnBase: React.CSSProperties = {
+    width: '100%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '0.625rem',
+    padding: '0.75rem',
+    borderRadius: '0.625rem',
+    border: '1px solid var(--border)',
+    background: 'var(--surface)',
+    color: 'var(--text)',
+    fontFamily: 'Syne, sans-serif',
+    fontSize: '0.875rem',
+    fontWeight: 500,
+    cursor: 'pointer',
+    transition: 'all 0.15s',
   }
 
   return (
-    <div className="space-y-3">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
       {error && (
-        <div className="text-sm px-4 py-3 rounded-lg border" style={{ color: 'var(--red-text)', borderColor: 'rgba(255,68,68,0.2)', background: 'rgba(255,68,68,0.05)' }}>
+        <div style={{
+          padding: '0.75rem',
+          borderRadius: '0.5rem',
+          background: 'rgba(255,68,68,0.06)',
+          border: '1px solid rgba(255,68,68,0.2)',
+          color: 'var(--red-text)',
+          fontSize: '0.8rem',
+        }}>
           {error}
         </div>
       )}
@@ -71,10 +86,9 @@ export default function OAuthButtons() {
         type="button"
         onClick={() => signIn('github')}
         disabled={!!loading}
-        className={btnCls}
-        style={{ ...btnStyle, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading && loading !== 'github' ? 0.5 : 1 }}
-        onMouseEnter={hoverOn}
-        onMouseLeave={hoverOff}
+        style={{ ...btnBase, opacity: loading && loading !== 'github' ? 0.5 : 1, cursor: loading ? 'not-allowed' : 'pointer' }}
+        onMouseEnter={e => { if (!loading) (e.currentTarget as HTMLElement).style.borderColor = 'var(--border2)' }}
+        onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'}
       >
         <GithubIcon />
         {loading === 'github' ? 'Conectando…' : 'Continuar con GitHub'}
@@ -84,10 +98,9 @@ export default function OAuthButtons() {
         type="button"
         onClick={() => signIn('google')}
         disabled={!!loading}
-        className={btnCls}
-        style={{ ...btnStyle, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading && loading !== 'google' ? 0.5 : 1 }}
-        onMouseEnter={hoverOn}
-        onMouseLeave={hoverOff}
+        style={{ ...btnBase, opacity: loading && loading !== 'google' ? 0.5 : 1, cursor: loading ? 'not-allowed' : 'pointer' }}
+        onMouseEnter={e => { if (!loading) (e.currentTarget as HTMLElement).style.borderColor = 'var(--border2)' }}
+        onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'}
       >
         <GoogleIcon />
         {loading === 'google' ? 'Conectando…' : 'Continuar con Google'}

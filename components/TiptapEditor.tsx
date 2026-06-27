@@ -9,10 +9,11 @@ import {
   Heading1, Heading2, Heading3,
   List, ListOrdered, Quote,
   Minus, Undo, Redo,
-  Sparkles, AlignLeft,
+  Sparkles, AlignLeft, Target,
 } from 'lucide-react'
 import { saveDocumentContent } from '@/lib/documents'
 import AIAssistant from '@/components/AIAssistant'
+import TableOfContents from '@/components/TableOfContents'
 import type { DocumentTemplate, ProjectSummary } from '@/lib/types'
 
 interface TiptapEditorProps {
@@ -22,27 +23,32 @@ interface TiptapEditorProps {
   project: ProjectSummary | null
   initialContent: Record<string, unknown> | null
   onSaveStatus: (status: 'saved' | 'saving' | 'unsaved') => void
+  saveStatus?: 'saved' | 'saving' | 'unsaved'
 }
 
 // Estilos tipográficos por plantilla — solo afectan el área de edición
 const TEMPLATE_STYLES: Record<DocumentTemplate, React.CSSProperties> = {
   free: {
-    fontFamily: 'Syne, sans-serif',
-    fontSize: '1rem',
-    lineHeight: '1.75',
+    fontFamily: 'Fenix, serif',
+    fontSize: '1.05rem',
+    lineHeight: '1.85',
   },
   apa: {
-    fontFamily: 'Georgia, serif',
+    fontFamily: 'Fenix, serif',
     fontSize: '1rem',
-    lineHeight: '2',        // doble espacio APA
-    textIndent: '2em',      // sangría de primera línea
+    lineHeight: '2',
   },
   scientific: {
-    fontFamily: 'Georgia, serif',
+    fontFamily: 'Syne, sans-serif',
     fontSize: '0.9375rem',
-    lineHeight: '1.8',
-    columnCount: 1,
+    lineHeight: '1.7',
   },
+}
+
+const SAVE_STATUS_LABELS: Record<string, string> = {
+  saving: 'Guardando…',
+  saved: 'Guardado',
+  unsaved: 'Sin guardar',
 }
 
 export default function TiptapEditor({
@@ -52,8 +58,13 @@ export default function TiptapEditor({
   project,
   initialContent,
   onSaveStatus,
+  saveStatus,
 }: TiptapEditorProps) {
   const [showAI, setShowAI] = useState(false)
+  const [showTOC, setShowTOC] = useState(true)
+  const [wordTarget, setWordTarget] = useState<number | null>(null)
+  const [showTargetInput, setShowTargetInput] = useState(false)
+  const [targetInputVal, setTargetInputVal] = useState('')
   const saveDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const editor = useEditor({
@@ -91,12 +102,51 @@ export default function TiptapEditor({
   // Cleanup debounce on unmount
   useEffect(() => () => { if (saveDebounce.current) clearTimeout(saveDebounce.current) }, [])
 
-  // Insertar markdown de la IA convirtiendo a texto plano (Tiptap lo parsea)
+  // Convierte markdown a nodos Tiptap reales para que el contenido
+  // generado por la IA aparezca con formato en el editor (headings,
+  // bold, listas) en vez de los símbolos crudos de markdown.
   const handleInsert = useCallback((markdown: string) => {
     if (!editor) return
-    // Insertamos al final del documento como texto. En Fase 3 se puede
-    // mejorar con un parseador de markdown a JSON de Tiptap.
-    editor.chain().focus().insertContent(markdown).run()
+
+    // Parseamos el markdown línea a línea a comandos de Tiptap
+    const lines = markdown.split('\n')
+    editor.chain().focus().run()
+
+    // Ir al final del documento primero
+    editor.commands.setTextSelection(editor.state.doc.content.size)
+
+    for (const line of lines) {
+      const trimmed = line.trim()
+      if (!trimmed) {
+        editor.commands.insertContent('<p></p>')
+        continue
+      }
+
+      if (trimmed.startsWith('### ')) {
+        editor.commands.insertContent(`<h3>${trimmed.slice(4)}</h3>`)
+      } else if (trimmed.startsWith('## ')) {
+        editor.commands.insertContent(`<h2>${trimmed.slice(3)}</h2>`)
+      } else if (trimmed.startsWith('# ')) {
+        editor.commands.insertContent(`<h1>${trimmed.slice(2)}</h1>`)
+      } else if (trimmed.startsWith('> ')) {
+        editor.commands.insertContent(`<blockquote><p>${trimmed.slice(2)}</p></blockquote>`)
+      } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+        editor.commands.insertContent(`<ul><li><p>${trimmed.slice(2)}</p></li></ul>`)
+      } else if (/^\d+\.\s/.test(trimmed)) {
+        editor.commands.insertContent(`<ol><li><p>${trimmed.replace(/^\d+\.\s/, '')}</p></li></ol>`)
+      } else if (trimmed === '---' || trimmed === '***' || trimmed === '___') {
+        editor.commands.insertContent('<hr />')
+      } else {
+        // Procesa inline: **bold**, *italic*, `code`
+        const html = trimmed
+          .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+          .replace(/\*(.+?)\*/g, '<em>$1</em>')
+          .replace(/_(.+?)_/g, '<em>$1</em>')
+          .replace(/`(.+?)`/g, '<code>$1</code>')
+        editor.commands.insertContent(`<p>${html}</p>`)
+      }
+    }
+
     setShowAI(false)
   }, [editor])
 
@@ -220,6 +270,66 @@ export default function TiptapEditor({
 
           <div style={{ flex: 1 }} />
 
+          {/* Objetivo de palabras */}
+          {showTargetInput ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+              <input
+                autoFocus
+                type="number"
+                value={targetInputVal}
+                onChange={e => setTargetInputVal(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    const n = parseInt(targetInputVal)
+                    setWordTarget(n > 0 ? n : null)
+                    setShowTargetInput(false)
+                    setTargetInputVal('')
+                  }
+                  if (e.key === 'Escape') { setShowTargetInput(false); setTargetInputVal('') }
+                }}
+                onBlur={() => { setShowTargetInput(false); setTargetInputVal('') }}
+                placeholder="ej. 2000"
+                style={{
+                  width: '80px', padding: '0.25rem 0.5rem',
+                  background: 'var(--surface2)', border: '1px solid var(--accent)',
+                  borderRadius: '0.3rem', color: 'var(--text)',
+                  fontFamily: 'DM Mono, monospace', fontSize: '0.65rem', outline: 'none',
+                }}
+              />
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowTargetInput(true)}
+              title={wordTarget ? `Objetivo: ${wordTarget} palabras` : 'Establecer objetivo de palabras'}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '0.3rem',
+                padding: '0.3rem 0.5rem', borderRadius: '0.3rem',
+                border: '1px solid var(--border)', background: 'transparent',
+                color: wordTarget ? 'var(--accent-text)' : 'var(--text-dim)',
+                cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: '0.6rem',
+                transition: 'all 0.1s',
+              }}>
+              <Target size={11} />
+              {wordTarget ? `${Math.min(wordCount, wordTarget)}/${wordTarget}` : 'Meta'}
+            </button>
+          )}
+
+          {/* TOC toggle */}
+          <button
+            onClick={() => setShowTOC(v => !v)}
+            title="Tabla de contenidos"
+            style={{
+              display: 'flex', alignItems: 'center', gap: '0.3rem',
+              padding: '0.3rem 0.5rem', borderRadius: '0.3rem',
+              border: showTOC ? '1px solid var(--accent)' : '1px solid var(--border)',
+              background: showTOC ? 'var(--accent-dim)' : 'transparent',
+              color: showTOC ? 'var(--accent-text)' : 'var(--text-dim)',
+              cursor: 'pointer', fontFamily: 'DM Mono, monospace', fontSize: '0.6rem',
+              transition: 'all 0.1s',
+            }}>
+            <AlignLeft size={11} />
+          </button>
+
           {/* Botón de IA */}
           <button
             onClick={() => setShowAI(v => !v)}
@@ -229,14 +339,10 @@ export default function TiptapEditor({
               borderRadius: '0.375rem',
               border: showAI ? '1px solid var(--accent)' : '1px solid var(--border)',
               background: showAI ? 'var(--accent-dim)' : 'transparent',
-              color: showAI ? 'var(--accent)' : 'var(--text-muted)',
-              cursor: 'pointer',
-              fontFamily: 'Syne, sans-serif',
-              fontSize: '0.72rem',
-              fontWeight: 600,
-              transition: 'all 0.15s',
-            }}
-          >
+              color: showAI ? 'var(--accent-text)' : 'var(--text-muted)',
+              cursor: 'pointer', fontFamily: 'Syne, sans-serif',
+              fontSize: '0.72rem', fontWeight: 600, transition: 'all 0.15s',
+            }}>
             <Sparkles size={12} />
             IA
           </button>
@@ -252,23 +358,41 @@ export default function TiptapEditor({
           </div>
         </div>
 
-        {/* Footer: word/char count */}
+        {/* Footer: word/char count + barra de progreso */}
         <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '1rem',
-          padding: '0.5rem 1.5rem',
-          borderTop: '1px solid var(--border)',
-          flexShrink: 0,
+          display: 'flex', alignItems: 'center', gap: '1rem',
+          padding: '0.5rem 1.5rem', borderTop: '1px solid var(--border)', flexShrink: 0,
         }}>
-          <AlignLeft size={11} style={{ color: 'var(--text-dim)' }} />
-          <span className="mono" style={{ fontSize: '0.6rem', color: 'var(--text-dim)', letterSpacing: '0.08em' }}>
+          <span className="mono" style={{ fontSize: '0.6rem', color: 'var(--text-dim)', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>
             {wordCount} palabras · {charCount} caracteres
           </span>
+          {wordTarget && wordTarget > 0 && (
+            <>
+              <div style={{ flex: 1, height: '3px', borderRadius: '2px', background: 'var(--border)', overflow: 'hidden' }}>
+                <div style={{
+                  height: '100%', borderRadius: '2px', transition: 'width 0.4s',
+                  background: wordCount >= wordTarget ? 'var(--accent)' : 'var(--blue)',
+                  width: `${Math.min((wordCount / wordTarget) * 100, 100)}%`,
+                }} />
+              </div>
+              <span className="mono" style={{ fontSize: '0.6rem', color: wordCount >= wordTarget ? 'var(--accent-text)' : 'var(--text-dim)', whiteSpace: 'nowrap' }}>
+                {wordCount >= wordTarget ? '✓ Meta alcanzada' : `${wordTarget - wordCount} palabras restantes`}
+              </span>
+            </>
+          )}
+          {saveStatus && (
+            <span className={`mono ${saveStatus === 'saving' ? 'saving-indicator' : ''}`}
+              style={{ fontSize: '0.6rem', color: saveStatus === 'saved' ? 'var(--accent-text)' : 'var(--text-dim)', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
+              {SAVE_STATUS_LABELS[saveStatus] || saveStatus}
+            </span>
+          )}
         </div>
       </div>
 
-      {/* AI sidebar */}
+      {/* Tabla de contenidos (izquierda) */}
+      {showTOC && <TableOfContents editor={editor} />}
+
+      {/* AI sidebar (derecha) */}
       {showAI && (
         <AIAssistant
           documentTitle={documentTitle}

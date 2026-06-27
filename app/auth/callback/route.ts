@@ -3,7 +3,10 @@ import { createClient } from '@/lib/supabase-server'
 
 // Maneja el retorno del proveedor OAuth (GitHub / Google).
 // Supabase redirige aquí con ?code=... ; lo intercambiamos por una sesión
-// del lado del servidor (cookies httpOnly) y mandamos a /documents.
+// y redirigimos a /documents (o a la ruta que venía en ?next=).
+//
+// IMPORTANTE: NEXT_PUBLIC_APP_URL debe estar configurada en Vercel para que
+// el redirect apunte al dominio real de producción y no a localhost.
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
@@ -15,13 +18,17 @@ export async function GET(request: Request) {
     const { error } = await supabase.auth.exchangeCodeForSession(code)
 
     if (!error) {
-      const forwardedHost = request.headers.get('x-forwarded-host')
-      const isLocal = process.env.NODE_ENV === 'development'
-      if (isLocal) return NextResponse.redirect(`${origin}${next}`)
-      if (forwardedHost) return NextResponse.redirect(`https://${forwardedHost}${next}`)
+      // En producción usamos NEXT_PUBLIC_APP_URL para evitar que
+      // x-forwarded-host o el origin del request apunten a localhost.
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL
+      if (appUrl) {
+        return NextResponse.redirect(`${appUrl}${next}`)
+      }
+      // Fallback: en desarrollo o si no está configurada, usamos el origin
       return NextResponse.redirect(`${origin}${next}`)
     }
   }
 
-  return NextResponse.redirect(`${origin}/login?error=oauth`)
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || origin
+  return NextResponse.redirect(`${appUrl}/login?error=oauth`)
 }

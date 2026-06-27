@@ -226,6 +226,7 @@ export default function DocumentEditorPage() {
           project={activeProject}
           initialContent={doc.content}
           onSaveStatus={setSaveStatus}
+          saveStatus={saveStatus}
         />
       </div>
 
