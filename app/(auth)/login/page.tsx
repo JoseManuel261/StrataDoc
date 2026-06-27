@@ -157,9 +157,11 @@ export default function LoginPage() {
 
           <p style={{ textAlign: 'center', fontFamily: 'Syne, sans-serif', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
             ¿No tienes cuenta?{' '}
-            <Link href="/register" style={{ color: 'var(--accent-text)', fontWeight: 600, textDecoration: 'none' }}
-              onMouseEnter={e => (e.currentTarget as HTMLElement).style.textDecoration = 'underline'}
-              onMouseLeave={e => (e.currentTarget as HTMLElement).style.textDecoration = 'none'}>
+            <Link 
+              href="/register" 
+              className="hover-underline"
+              style={{ color: 'var(--accent-text)', fontWeight: 600, textDecoration: 'none' }}
+            >
               Regístrate gratis
             </Link>
           </p>
@@ -173,6 +175,9 @@ export default function LoginPage() {
       <style>{`
         @media (min-width: 768px) {
           .doc-panel { display: flex !important; }
+        }
+        .hover-underline:hover {
+          text-decoration: underline !important;
         }
       `}</style>
     </div>
