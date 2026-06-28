@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { ArrowLeft, CheckCircle2, Loader2, Link2 } from 'lucide-react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
+import ThemeToggle from '@/components/ThemeToggle'
 import {
   getDocument,
   updateDocumentMeta,
@@ -38,20 +39,22 @@ export default function DocumentEditorPage() {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved')
   const titleDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Proyecto activo (objeto completo para pasar al asistente IA)
+  // Proyecto activo — se recalcula cuando cambia doc.project_id o la lista de proyectos
   const activeProject = projects.find(p => p.id === doc?.project_id) ?? null
 
   useEffect(() => {
     async function load() {
       try {
+        // Cargamos en paralelo; cuando ambos resuelven seteamos el estado juntos
+        // para evitar la race condition donde activeProject queda null un frame.
         const [docData, projectsData] = await Promise.all([
           getDocument(id),
           getAccessibleProjects(),
         ])
         if (!docData) { router.push('/documents'); return }
+        setProjects(projectsData)
         setDoc(docData)
         setTitle(docData.title)
-        setProjects(projectsData)
       } catch {
         toast.error('No se pudo cargar el documento')
         router.push('/documents')
@@ -110,18 +113,21 @@ export default function DocumentEditorPage() {
   if (!doc) return null
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', minWidth: 0 }}>
 
       {/* Toolbar superior */}
       <div style={{
         position: 'sticky', top: 0, zIndex: 30,
-        display: 'flex', alignItems: 'center', gap: '0.75rem',
-        padding: '0.625rem 1.25rem',
+        display: 'flex', alignItems: 'center', gap: '0.5rem',
+        padding: '0.5rem 1rem',
         borderBottom: '1px solid var(--border)',
-        background: 'rgba(10,10,10,0.92)',
+        background: 'var(--surface)',
         backdropFilter: 'blur(8px)',
         flexShrink: 0,
+        flexWrap: 'wrap',
+        minWidth: 0,
       }}>
+        {/* Volver */}
         <Link href="/documents"
           style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', flexShrink: 0 }}
           onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--text)'}
@@ -136,6 +142,7 @@ export default function DocumentEditorPage() {
           placeholder="Sin título"
           style={{
             flex: 1,
+            minWidth: '120px',
             background: 'transparent',
             border: 'none',
             outline: 'none',
@@ -143,7 +150,6 @@ export default function DocumentEditorPage() {
             fontFamily: 'Fenix, serif',
             fontSize: '1rem',
             letterSpacing: '-0.01em',
-            minWidth: 0,
           }}
         />
 
@@ -166,12 +172,12 @@ export default function DocumentEditorPage() {
           )}
         </div>
 
-        {/* Plantilla */}
+        {/* Plantilla — con value correcto para que sea controlado */}
         <select
           value={doc.template}
           onChange={e => handleTemplateChange(e.target.value as DocumentTemplate)}
           style={{
-            background: 'var(--surface)',
+            background: 'var(--surface2)',
             border: '1px solid var(--border)',
             color: 'var(--text)',
             borderRadius: '0.375rem',
@@ -199,7 +205,7 @@ export default function DocumentEditorPage() {
             value={doc.project_id ?? ''}
             onChange={e => handleProjectChange(e.target.value || null)}
             style={{
-              background: 'var(--surface)',
+              background: 'var(--surface2)',
               border: '1px solid var(--border)',
               color: doc.project_id ? 'var(--text)' : 'var(--text-dim)',
               borderRadius: '0.375rem',
@@ -208,17 +214,20 @@ export default function DocumentEditorPage() {
               fontFamily: 'DM Mono, monospace',
               outline: 'none',
               cursor: 'pointer',
-              maxWidth: '160px',
+              maxWidth: '150px',
             }}
           >
             <option value="">Sin proyecto</option>
             {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </div>
+
+        {/* ThemeToggle en el editor */}
+        <ThemeToggle />
       </div>
 
       {/* Editor Tiptap */}
-      <div style={{ flex: 1, overflow: 'hidden', display: 'flex' }}>
+      <div style={{ flex: 1, overflow: 'hidden', display: 'flex', minWidth: 0 }}>
         <TiptapEditor
           documentId={id}
           documentTitle={title}
@@ -226,7 +235,6 @@ export default function DocumentEditorPage() {
           project={activeProject}
           initialContent={doc.content}
           onSaveStatus={setSaveStatus}
-          saveStatus={saveStatus}
         />
       </div>
 
