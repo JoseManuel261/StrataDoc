@@ -3,14 +3,32 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import ThemeToggle from '@/components/ThemeToggle'
 import NetworkToast from '@/components/NetworkToast'
-import { FileText, Plus, LogOut } from 'lucide-react'
+import { FileText, Plus, LogOut, ExternalLink } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
+
+const STRATA_URL = process.env.NEXT_PUBLIC_STRATA_URL || 'https://gestor-tareas-psi-one.vercel.app'
 
 export default function DocumentsLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
+  const [username, setUsername] = useState<string | null>(null)
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        const name =
+          user.user_metadata?.full_name ||
+          user.user_metadata?.name ||
+          user.user_metadata?.username ||
+          user.email?.split('@')[0] ||
+          null
+        setUsername(name)
+      }
+    })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleSignOut() {
     await supabase.auth.signOut()
@@ -19,6 +37,7 @@ export default function DocumentsLayout({ children }: { children: React.ReactNod
   }
 
   // En la página del editor el sidebar no aplica — usamos layout full
+  // pero sí mostramos el ThemeToggle en la barra superior del editor
   const isEditor = /^\/documents\/[^/]+$/.test(pathname) && pathname !== '/documents/new'
 
   if (isEditor) {
@@ -35,7 +54,7 @@ export default function DocumentsLayout({ children }: { children: React.ReactNod
       <NetworkToast />
 
       {/* Sidebar */}
-      <aside style={{
+      <aside className="app-sidebar" style={{
         width: '220px',
         flexShrink: 0,
         borderRight: '1px solid var(--border)',
@@ -46,7 +65,7 @@ export default function DocumentsLayout({ children }: { children: React.ReactNod
         background: 'var(--surface)',
         zIndex: 40,
       }}>
-        {/* Logo */}
+        {/* Logo + ThemeToggle */}
         <div style={{
           padding: '1.25rem 1rem',
           borderBottom: '1px solid var(--border)',
@@ -61,6 +80,40 @@ export default function DocumentsLayout({ children }: { children: React.ReactNod
           </Link>
           <ThemeToggle />
         </div>
+
+        {/* Usuario actual */}
+        {username && (
+          <div style={{
+            padding: '0.75rem 1rem',
+            borderBottom: '1px solid var(--border)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+          }}>
+            <div style={{
+              width: '24px', height: '24px',
+              borderRadius: '50%',
+              background: 'var(--accent-dim)',
+              border: '1px solid var(--accent)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0,
+            }}>
+              <span style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.6rem', fontWeight: 700, color: 'var(--accent-text)' }}>
+                {username.charAt(0).toUpperCase()}
+              </span>
+            </div>
+            <span style={{
+              fontFamily: 'Syne, sans-serif',
+              fontSize: '0.75rem',
+              color: 'var(--text-muted)',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}>
+              {username}
+            </span>
+          </div>
+        )}
 
         {/* Nav */}
         <nav style={{ flex: 1, padding: '0.75rem 0.5rem', overflowY: 'auto' }}>
@@ -93,8 +146,36 @@ export default function DocumentsLayout({ children }: { children: React.ReactNod
           </Link>
         </div>
 
+        {/* Volver a Strata */}
+        <div style={{ padding: '0 0.75rem', paddingBottom: '0.375rem' }}>
+          <a
+            href={STRATA_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'flex', alignItems: 'center', gap: '0.5rem',
+              width: '100%',
+              padding: '0.5rem 0.75rem',
+              borderRadius: '0.375rem',
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              color: 'var(--text-muted)',
+              fontSize: '0.75rem',
+              fontFamily: 'Syne, sans-serif',
+              textDecoration: 'none',
+              transition: 'color 0.15s',
+            }}
+            onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--accent-text)'}
+            onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'}
+          >
+            <ExternalLink size={13} />
+            Ir a Strata
+          </a>
+        </div>
+
         {/* Sign out */}
-        <div style={{ padding: '0.75rem', borderTop: '1px solid var(--border)' }}>
+        <div style={{ padding: '0 0.75rem', paddingBottom: '0.75rem' }}>
           <button
             onClick={handleSignOut}
             style={{
@@ -119,7 +200,7 @@ export default function DocumentsLayout({ children }: { children: React.ReactNod
         </div>
       </aside>
 
-      <main style={{ marginLeft: '220px', flex: 1, minWidth: 0 }}>
+      <main className="app-main" style={{ marginLeft: '220px', flex: 1, minWidth: 0 }}>
         {children}
       </main>
     </div>

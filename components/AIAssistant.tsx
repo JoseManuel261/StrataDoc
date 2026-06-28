@@ -18,9 +18,28 @@ interface AIAssistantProps {
   documentTitle: string
   template: DocumentTemplate
   project: ProjectSummary | null
-  currentText: string
+  getCurrentText: () => string
   onInsert: (markdown: string) => void
   onClose: () => void
+}
+
+// Shapes de respuesta raw de Supabase (tablas de Strata)
+interface RawTask {
+  title: string
+  status: string
+  priority: string
+  assignee: { username: string } | null
+}
+
+interface RawTaskId {
+  id: string
+}
+
+interface RawHistory {
+  field: string
+  old_value: string | null
+  new_value: string | null
+  task: { title: string } | null
 }
 
 // Carga las tareas reales del proyecto vinculado desde la misma
@@ -33,7 +52,7 @@ async function fetchProjectTasks(projectId: string): Promise<TaskContext[]> {
     .eq('project_id', projectId)
     .limit(30)
   if (!data) return []
-  return data.map((t: any) => ({
+  return (data as unknown as RawTask[]).map((t) => ({
     title: t.title,
     status: t.status,
     priority: t.priority,
@@ -49,7 +68,7 @@ async function fetchProjectHistory(projectId: string): Promise<string[]> {
     .select('id')
     .eq('project_id', projectId)
   if (!taskIds?.length) return []
-  const ids = taskIds.map((t: any) => t.id)
+  const ids = (taskIds as unknown as RawTaskId[]).map((t) => t.id)
   const { data } = await supabase
     .from('task_history')
     .select('field, old_value, new_value, task:tasks(title)')
@@ -57,7 +76,7 @@ async function fetchProjectHistory(projectId: string): Promise<string[]> {
     .order('created_at', { ascending: false })
     .limit(20)
   if (!data) return []
-  return data.map((h: any) =>
+  return (data as unknown as RawHistory[]).map((h) =>
     `${h.task?.title}: ${h.field} cambió de ${h.old_value || 'ninguno'} a ${h.new_value || 'ninguno'}`
   )
 }
@@ -66,7 +85,7 @@ export default function AIAssistant({
   documentTitle,
   template,
   project,
-  currentText,
+  getCurrentText,
   onInsert,
   onClose,
 }: AIAssistantProps) {
@@ -103,6 +122,7 @@ export default function AIAssistant({
       const projectContext = project
         ? {
             projectName: project.name,
+            projectDescription: project.description ?? undefined,
             tasks: tasks.map(t => ({
               title: t.title,
               status: t.status === 'COMPLETED' ? 'Completada' : t.status === 'IN_PROGRESS' ? 'En progreso' : 'Pendiente',
@@ -116,7 +136,7 @@ export default function AIAssistant({
       const endpoint = mode === 'draft' ? '/api/ai/draft' : '/api/ai/suggest'
       const body = mode === 'draft'
         ? { documentTitle, template, userPrompt: prompt, projectContext }
-        : { documentTitle, template, currentContent: currentText, userRequest: prompt, projectContext }
+        : { documentTitle, template, currentContent: getCurrentText(), userRequest: prompt, projectContext }
 
       const res = await fetch(endpoint, {
         method: 'POST',
@@ -145,7 +165,7 @@ export default function AIAssistant({
   }
 
   return (
-    <div style={panel}>
+    <div className="ai-panel" style={panel}>
       {/* Header */}
       <div style={{ padding: '0.875rem 1rem', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -221,8 +241,12 @@ export default function AIAssistant({
       {/* Hint */}
       <p style={{ padding: '0 0.875rem 0.5rem', fontSize: '0.68rem', color: 'var(--text-muted)', lineHeight: 1.5, flexShrink: 0 }}>
         {mode === 'draft'
-          ? project && tasks.length > 0
-            ? `La IA usará las ${tasks.length} tareas de "${project.name}" para generar el borrador.`
+          ? project
+            ? tasks.length > 0
+              ? `La IA usará la descripción y las ${tasks.length} tareas de "${project.name}".`
+              : project.description
+                ? `La IA usará la descripción de "${project.name}" para generar el borrador.`
+                : `La IA usará el nombre del proyecto "${project.name}". Puedes agregar instrucciones adicionales.`
             : 'Describe qué documento quieres generar y la IA creará un borrador completo.'
           : 'Describe qué necesitas o deja vacío para que la IA sugiera cómo continuar.'}
       </p>

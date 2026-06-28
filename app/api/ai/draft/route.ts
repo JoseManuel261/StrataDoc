@@ -3,9 +3,10 @@ import { createClient } from '@/lib/supabase-server'
 
 export const runtime = 'nodejs'
 
-// Rate limiting en memoria — mismo patrón que Strata
+// Rate limiting en memoria — funciona en dev; en Vercel se puede sustituir
+// por Upstash Redis, pero para v1 esto es suficiente como throttle básico.
 const requestCounts = new Map<string, { count: number; resetAt: number }>()
-const RATE_LIMIT = 10   // borradores son caros en tokens
+const RATE_LIMIT = 10
 const RATE_WINDOW = 60 * 1000
 
 function checkRateLimit(ip: string): boolean {
@@ -22,19 +23,24 @@ function checkRateLimit(ip: string): boolean {
 
 /**
  * POST /api/ai/draft
- * Genera un borrador completo del documento usando el contexto opcional
- * de un proyecto de Strata (tareas, historial) y las instrucciones del usuario.
+ * Genera un borrador completo alimentado por:
+ *   - título y plantilla del documento
+ *   - instrucciones libres del usuario
+ *   - descripción del proyecto (si existe)
+ *   - tareas + historial del proyecto en Strata (si existen)
  *
  * Body: {
  *   documentTitle: string
  *   template: 'free' | 'apa' | 'scientific'
- *   userPrompt: string          // qué quiere generar el usuario
- *   projectContext?: {          // opcional, si el doc está vinculado a Strata
+ *   userPrompt: string
+ *   projectContext?: {
  *     projectName: string
- *     tasks: { title: string; status: string; priority: string }[]
+ *     projectDescription?: string
+ *     tasks: { title: string; status: string; priority: string; assignee?: string }[]
+ *     recentHistory?: string[]
  *   }
  * }
- * Response: { draft: string }   // markdown que el editor convierte a Tiptap JSON
+ * Response: { draft: string }  — markdown que el editor convierte a Tiptap JSON
  */
 export async function POST(req: NextRequest) {
   try {
@@ -57,39 +63,54 @@ export async function POST(req: NextRequest) {
 
     const documentTitle = sanitize(body.documentTitle, 200)
     const template      = sanitize(body.template, 20)
-    const userPrompt    = sanitize(body.userPrompt, 1000)
+    const userPrompt    = sanitize(body.userPrompt, 1500)
     const projectCtx    = body.projectContext
 
     const templateInstructions: Record<string, string> = {
       apa:        'Usa formato APA: párrafos con sangría, citas entre paréntesis (Autor, año), secciones: Resumen, Introducción, Desarrollo, Conclusiones, Referencias.',
       scientific: 'Usa estructura de artículo científico: Abstract, Introducción, Metodología, Resultados, Discusión, Conclusión.',
-      free:       'Usa formato libre. Organiza el contenido de la forma más clara posible para el lector.',
+      free:       'Usa formato libre. Organiza el contenido de la forma más clara y útil posible para el lector.',
     }
 
-    const projectSection = projectCtx
-      ? `\nCONTEXTO DEL PROYECTO EN STRATA:
-Proyecto: ${sanitize(projectCtx.projectName, 100)}
-Tareas del equipo:
-${Array.isArray(projectCtx.tasks)
-  ? projectCtx.tasks.slice(0, 15).map((t: { title: string; status: string; priority: string }) =>
-      `  • [${sanitize(t.status, 15)}] ${sanitize(t.title, 100)}`
-    ).join('\n')
-  : 'Sin tareas disponibles.'
-}`
-      : ''
+    // Construye el bloque de contexto del proyecto con descripción + tareas + historial
+    let projectSection = ''
+    if (projectCtx) {
+      const projectName = sanitize(projectCtx.projectName, 100)
+      const desc = projectCtx.projectDescription
+        ? `\nDescripción del proyecto: ${sanitize(projectCtx.projectDescription, 800)}`
+        : ''
 
-    const systemPrompt = `Eres el asistente de escritura de StrataDOC, un editor de documentos para equipos.
-Tu tarea es generar un borrador completo, bien estructurado y listo para editar.
+      const tasksBlock = Array.isArray(projectCtx.tasks) && projectCtx.tasks.length > 0
+        ? `\nTareas del equipo:\n${projectCtx.tasks.slice(0, 20).map((t: { title: string; status: string; priority: string; assignee?: string }) =>
+            `  • [${sanitize(t.status, 15)}] ${sanitize(t.title, 120)}${t.assignee ? ` — ${t.assignee}` : ''}`
+          ).join('\n')}`
+        : '\n(Sin tareas registradas aún.)'
+
+      const historyBlock = Array.isArray(projectCtx.recentHistory) && projectCtx.recentHistory.length > 0
+        ? `\nActividad reciente del equipo:\n${projectCtx.recentHistory.slice(0, 15).map((h: string) => `  · ${sanitize(h, 150)}`).join('\n')}`
+        : ''
+
+      projectSection = `\n\nCONTEXTO DEL PROYECTO "${projectName}" (desde Strata):${desc}${tasksBlock}${historyBlock}`
+    }
+
+    const systemPrompt = `Eres el asistente de escritura de StrataDOC, un editor de documentos académicos y técnicos para equipos de software.
+Tu tarea es generar un borrador completo, bien estructurado, detallado y listo para editar.
 
 Instrucciones de formato: ${templateInstructions[template] ?? templateInstructions.free}
 ${projectSection}
 
-Reglas:
-- Responde ÚNICAMENTE con el contenido del documento, sin preámbulos ni explicaciones fuera del texto.
-- Usa Markdown: # para títulos, ## para secciones, **negrita**, listas con -.
-- Responde SIEMPRE en español.
-- El borrador debe ser sustancial: mínimo 4 secciones bien desarrolladas.
-- No incluyas notas al margen ni comentarios sobre el documento.`
+Reglas estrictas:
+- Responde ÚNICAMENTE con el contenido del documento, sin preámbulos, sin frases como "Aquí está el borrador" ni explicaciones fuera del texto.
+- Usa Markdown: # para H1, ## para H2, ### para H3, **negrita**, *cursiva*, listas con -.
+- Responde SIEMPRE en español colombiano, con tono académico-profesional.
+- El borrador debe ser EXTENSO y SUSTANCIAL: mínimo 6 secciones bien desarrolladas con párrafos completos (no solo listas).
+- Si hay contexto del proyecto, úsalo activamente: menciona tareas específicas, el nombre del proyecto, y construye el documento sobre esa base real.
+- Si el proyecto tiene descripción, úsala como fuente principal del contenido.
+- No incluyas notas al margen, meta-comentarios ni aclaraciones sobre el documento generado.`
+
+    const userMessage = `Título del documento: "${documentTitle}"
+
+${userPrompt ? `Instrucciones adicionales: ${userPrompt}` : 'Genera un borrador completo y sustancial basado en el contexto disponible.'}`
 
     const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
@@ -98,22 +119,27 @@ Reglas:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'llama-3.1-8b-instant',
-        max_tokens: 2048,
-        temperature: 0.6,
+        model: 'llama-3.3-70b-versatile',   // modelo más capaz para borradores largos
+        max_tokens: 4096,
+        temperature: 0.55,
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: `Título del documento: "${documentTitle}"\n\nInstrucciones: ${userPrompt}` },
+          { role: 'user', content: userMessage },
         ],
       }),
     })
 
-    if (!res.ok) return NextResponse.json({ error: 'Error al contactar Groq' }, { status: 502 })
+    if (!res.ok) {
+      const errText = await res.text()
+      console.error('Groq draft error:', errText)
+      return NextResponse.json({ error: 'Error al contactar Groq' }, { status: 502 })
+    }
 
     const data = await res.json()
     const draft = data.choices?.[0]?.message?.content ?? ''
     return NextResponse.json({ draft })
-  } catch {
+  } catch (err) {
+    console.error('Draft route error:', err)
     return NextResponse.json({ error: 'Error interno' }, { status: 500 })
   }
 }

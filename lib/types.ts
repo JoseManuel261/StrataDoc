@@ -35,6 +35,7 @@ export type DocumentSummary = Omit<DocumentWithMeta, 'content'>
 export interface ProjectSummary {
   id: string
   name: string
+  description?: string | null
 }
 
 export const TEMPLATE_LABELS: Record<DocumentTemplate, string> = {

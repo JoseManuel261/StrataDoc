@@ -23,7 +23,6 @@ interface TiptapEditorProps {
   project: ProjectSummary | null
   initialContent: Record<string, unknown> | null
   onSaveStatus: (status: 'saved' | 'saving' | 'unsaved') => void
-  saveStatus?: 'saved' | 'saving' | 'unsaved'
 }
 
 // Estilos tipográficos por plantilla — solo afectan el área de edición
@@ -45,10 +44,14 @@ const TEMPLATE_STYLES: Record<DocumentTemplate, React.CSSProperties> = {
   },
 }
 
-const SAVE_STATUS_LABELS: Record<string, string> = {
-  saving: 'Guardando…',
-  saved: 'Guardado',
-  unsaved: 'Sin guardar',
+
+// Convierte marcado inline de markdown a HTML — **bold**, *italic*, `code`
+function inlineToHtml(text: string): string {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/_(.+?)_/g, '<em>$1</em>')
+    .replace(/`(.+?)`/g, '<code>$1</code>')
 }
 
 export default function TiptapEditor({
@@ -58,7 +61,6 @@ export default function TiptapEditor({
   project,
   initialContent,
   onSaveStatus,
-  saveStatus,
 }: TiptapEditorProps) {
   const [showAI, setShowAI] = useState(false)
   const [showTOC, setShowTOC] = useState(true)
@@ -90,7 +92,8 @@ export default function TiptapEditor({
       saveDebounce.current = setTimeout(async () => {
         try {
           onSaveStatus('saving')
-          await saveDocumentContent(documentId, editor.getJSON() as Record<string, unknown>)
+          const wc = editor.storage.characterCount.words() as number
+          await saveDocumentContent(documentId, editor.getJSON() as Record<string, unknown>, wc)
           onSaveStatus('saved')
         } catch {
           onSaveStatus('unsaved')
@@ -108,44 +111,82 @@ export default function TiptapEditor({
   const handleInsert = useCallback((markdown: string) => {
     if (!editor) return
 
-    // Parseamos el markdown línea a línea a comandos de Tiptap
-    const lines = markdown.split('\n')
+    // Si el documento está vacío (solo un párrafo vacío), lo limpiamos
+    // antes de insertar para no dejar un párrafo huérfano al inicio.
+    const isEmpty = editor.state.doc.textContent.trim() === ''
+    if (isEmpty) {
+      editor.commands.clearContent()
+    }
+
     editor.chain().focus().run()
 
-    // Ir al final del documento primero
+    // Ir al final del documento
     editor.commands.setTextSelection(editor.state.doc.content.size)
 
+    // Acumulamos ítems de lista consecutivos para insertarlos como
+    // un solo nodo <ul>/<ol> y evitar el problema de anidamiento.
+    let pendingList: { type: 'ul' | 'ol'; items: string[] } | null = null
+
+    function flushList() {
+      if (!pendingList) return
+      if (pendingList.type === 'ul') {
+        const html = `<ul>${pendingList.items.map(i => `<li><p>${i}</p></li>`).join('')}</ul>`
+        editor!.commands.insertContent(html)
+      } else {
+        const html = `<ol>${pendingList.items.map(i => `<li><p>${i}</p></li>`).join('')}</ol>`
+        editor!.commands.insertContent(html)
+      }
+      pendingList = null
+    }
+
+    const lines = markdown.split('\n')
     for (const line of lines) {
       const trimmed = line.trim()
-      if (!trimmed) {
-        editor.commands.insertContent('<p></p>')
+
+      // Detectar ítems de lista y acumularlos
+      if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+        const text = inlineToHtml(trimmed.slice(2))
+        if (pendingList?.type === 'ul') {
+          pendingList.items.push(text)
+        } else {
+          flushList()
+          pendingList = { type: 'ul', items: [text] }
+        }
+        continue
+      }
+      if (/^\d+\.\s/.test(trimmed)) {
+        const text = inlineToHtml(trimmed.replace(/^\d+\.\s/, ''))
+        if (pendingList?.type === 'ol') {
+          pendingList.items.push(text)
+        } else {
+          flushList()
+          pendingList = { type: 'ol', items: [text] }
+        }
         continue
       }
 
-      if (trimmed.startsWith('### ')) {
-        editor.commands.insertContent(`<h3>${trimmed.slice(4)}</h3>`)
+      // Cualquier otro nodo cierra la lista pendiente
+      flushList()
+
+      if (!trimmed) {
+        editor.commands.insertContent('<p></p>')
+      } else if (trimmed.startsWith('### ')) {
+        editor.commands.insertContent(`<h3>${inlineToHtml(trimmed.slice(4))}</h3>`)
       } else if (trimmed.startsWith('## ')) {
-        editor.commands.insertContent(`<h2>${trimmed.slice(3)}</h2>`)
+        editor.commands.insertContent(`<h2>${inlineToHtml(trimmed.slice(3))}</h2>`)
       } else if (trimmed.startsWith('# ')) {
-        editor.commands.insertContent(`<h1>${trimmed.slice(2)}</h1>`)
+        editor.commands.insertContent(`<h1>${inlineToHtml(trimmed.slice(2))}</h1>`)
       } else if (trimmed.startsWith('> ')) {
-        editor.commands.insertContent(`<blockquote><p>${trimmed.slice(2)}</p></blockquote>`)
-      } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-        editor.commands.insertContent(`<ul><li><p>${trimmed.slice(2)}</p></li></ul>`)
-      } else if (/^\d+\.\s/.test(trimmed)) {
-        editor.commands.insertContent(`<ol><li><p>${trimmed.replace(/^\d+\.\s/, '')}</p></li></ol>`)
+        editor.commands.insertContent(`<blockquote><p>${inlineToHtml(trimmed.slice(2))}</p></blockquote>`)
       } else if (trimmed === '---' || trimmed === '***' || trimmed === '___') {
         editor.commands.insertContent('<hr />')
       } else {
-        // Procesa inline: **bold**, *italic*, `code`
-        const html = trimmed
-          .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-          .replace(/\*(.+?)\*/g, '<em>$1</em>')
-          .replace(/_(.+?)_/g, '<em>$1</em>')
-          .replace(/`(.+?)`/g, '<code>$1</code>')
-        editor.commands.insertContent(`<p>${html}</p>`)
+        editor.commands.insertContent(`<p>${inlineToHtml(trimmed)}</p>`)
       }
     }
+
+    // Volcar cualquier lista pendiente al final
+    flushList()
 
     setShowAI(false)
   }, [editor])
@@ -162,6 +203,9 @@ export default function TiptapEditor({
 
   return (
     <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+      {/* Tabla de contenidos — panel izquierdo */}
+      {showTOC && <TableOfContents editor={editor} />}
+
       {/* Editor area */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
@@ -380,17 +424,8 @@ export default function TiptapEditor({
               </span>
             </>
           )}
-          {saveStatus && (
-            <span className={`mono ${saveStatus === 'saving' ? 'saving-indicator' : ''}`}
-              style={{ fontSize: '0.6rem', color: saveStatus === 'saved' ? 'var(--accent-text)' : 'var(--text-dim)', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
-              {SAVE_STATUS_LABELS[saveStatus] || saveStatus}
-            </span>
-          )}
         </div>
       </div>
-
-      {/* Tabla de contenidos (izquierda) */}
-      {showTOC && <TableOfContents editor={editor} />}
 
       {/* AI sidebar (derecha) */}
       {showAI && (
@@ -398,7 +433,7 @@ export default function TiptapEditor({
           documentTitle={documentTitle}
           template={template}
           project={project}
-          currentText={getCurrentText()}
+          getCurrentText={getCurrentText}
           onInsert={handleInsert}
           onClose={() => setShowAI(false)}
         />

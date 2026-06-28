@@ -69,7 +69,7 @@ body::after {
   inset: 0;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.025'/%3E%3C/svg%3E");
   pointer-events: none;
-  z-index: 9999;
+  z-index: 1;
 }
 
 ::selection {
@@ -425,7 +425,7 @@ body::after {
   background: var(--surface);
   overflow-x: auto;
   scrollbar-width: none;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   flex-shrink: 0;
 }
 .editor-toolbar::-webkit-scrollbar { display: none; }
@@ -500,3 +500,41 @@ body::after {
 .toc-item.toc-h1 { font-weight: 600; }
 .toc-item.toc-h2 { padding-left: 1rem; }
 .toc-item.toc-h3 { padding-left: 1.75rem; font-size: 0.65rem; }
+
+
+/* =====================================================
+   RESPONSIVE — mobile first
+   ===================================================== */
+
+/* Sidebar */
+@media (max-width: 767px) {
+  .app-sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+  }
+  .app-main {
+    margin-left: 0 !important;
+  }
+}
+
+/* TOC: se oculta en pantallas pequeñas */
+@media (max-width: 900px) {
+  .toc-panel {
+    display: none !important;
+  }
+}
+
+/* AI panel: más estrecho en tablet */
+@media (max-width: 900px) {
+  .ai-panel {
+    width: 260px !important;
+  }
+}
+
+/* Editor toolbar: permite wrapping y scroll horizontal en mobile */
+@media (max-width: 600px) {
+  .editor-toolbar-inner {
+    gap: 0.0625rem;
+    padding: 0.375rem 0.75rem;
+  }
+}

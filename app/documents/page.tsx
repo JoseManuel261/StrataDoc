@@ -89,7 +89,7 @@ export default function DocumentsPage() {
   }
 
   const recent = docs.slice(0, 3)
-  const all = docs
+  const rest = docs.slice(3)          // los que NO aparecen en recientes
 
   return (
     <div style={{ padding: '2.5rem 2rem', maxWidth: '900px', margin: '0 auto' }}>
@@ -223,8 +223,8 @@ export default function DocumentsPage() {
             ))}
           </div>
 
-          {/* Lista completa */}
-          {all.length > 0 && (
+          {/* Lista del resto — los que no aparecen en recientes */}
+          {rest.length > 0 && (
             <>
               <div style={{ marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <FolderOpen size={12} style={{ color: 'var(--text-dim)' }} />
@@ -233,7 +233,7 @@ export default function DocumentsPage() {
                 </span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                {all.map(doc => (
+                {rest.map(doc => (
                   <div key={doc.id} className="doc-row"
                     style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 0.875rem', borderRadius: '0.625rem', border: '1px solid var(--border)', background: 'var(--surface)', transition: 'border-color 0.15s' }}
                     onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border2)'}

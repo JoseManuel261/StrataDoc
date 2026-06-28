@@ -95,17 +95,20 @@ export async function updateDocumentMeta(
 }
 
 /**
- * Guarda el contenido Tiptap (JSON) del documento.
+ * Guarda el contenido Tiptap (JSON) del documento y actualiza word_count.
  * Llamado por el autoguardado del editor (con debounce).
  */
 export async function saveDocumentContent(
   id: string,
-  content: Record<string, unknown>
+  content: Record<string, unknown>,
+  wordCount?: number
 ): Promise<void> {
   const supabase = createClient()
+  const patch: Record<string, unknown> = { content }
+  if (typeof wordCount === 'number') patch.word_count = wordCount
   const { error } = await supabase
     .from('documents')
-    .update({ content })
+    .update(patch)
     .eq('id', id)
 
   if (error) throw error
@@ -139,7 +142,7 @@ export async function getAccessibleProjects(): Promise<ProjectSummary[]> {
   const supabase = createClient()
   const { data, error } = await supabase
     .from('projects')
-    .select('id, name')
+    .select('id, name, description')
     .order('name')
 
   if (error) throw error

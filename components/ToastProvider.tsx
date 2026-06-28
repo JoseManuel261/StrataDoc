@@ -1,6 +1,6 @@
 'use client'
-import { createContext, useContext, useState, useCallback, ReactNode } from 'react'
-import { CheckCircle2, AlertCircle, XCircle, Info, X } from 'lucide-react'
+import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react'
+import { CheckCircle2, XCircle, Info, X } from 'lucide-react'
 
 type ToastType = 'success' | 'error' | 'info'
 
@@ -18,7 +18,7 @@ interface ToastContextType {
 
 const ToastContext = createContext<ToastContextType | null>(null)
 
-const ICONS: Record<ToastType, any> = {
+const ICONS: Record<ToastType, React.ElementType> = {
   success: CheckCircle2,
   error: XCircle,
   info: Info,

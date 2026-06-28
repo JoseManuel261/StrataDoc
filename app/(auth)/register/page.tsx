@@ -33,79 +33,272 @@ export default function RegisterPage() {
     }
   }
 
-  const inputStyle = {
-    background: 'var(--surface)',
-    border: '1px solid var(--border)',
-    color: 'var(--text)',
-  }
-
   return (
-    <div className="min-h-screen flex items-center justify-center px-4" style={{background: 'var(--bg)'}}>
-      <div className="w-full max-w-sm animate-fade-up">
-        <div className="mb-10">
-          <span className="mono text-xs tracking-widest uppercase" style={{color: 'var(--accent)'}}>StrataDOC</span>
-          <h1 className="text-3xl font-bold mt-2" style={{color: 'var(--text)'}}>Crea tu cuenta</h1>
-          <p className="mt-1 text-sm" style={{color: 'var(--text-muted)'}}>Empieza a documentar tus proyectos</p>
+    <div style={{
+      minHeight: '100vh',
+      display: 'flex',
+      background: 'var(--bg)',
+    }}>
+      {/* Panel izquierdo — identidad visual StrataDOC */}
+      <div
+        className="doc-panel"
+        style={{
+          display: 'none',
+          flex: '0 0 45%',
+          background: 'var(--surface)',
+          borderRight: '1px solid var(--border)',
+          padding: '3rem',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+        }}
+      >
+        {/* Logo */}
+        <div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.15em', marginBottom: '3rem' }}>
+            <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: '1.1rem', color: 'var(--text)', letterSpacing: '-0.02em' }}>
+              Strata
+            </span>
+            <span style={{ fontFamily: 'Fenix, serif', fontSize: '1.1rem', color: 'var(--accent)', letterSpacing: '-0.01em' }}>
+              DOC
+            </span>
+          </div>
+
+          {/* Vista previa simulada */}
+          <div style={{
+            background: 'var(--surface2)',
+            border: '1px solid var(--border)',
+            borderRadius: '0.75rem',
+            padding: '1.5rem',
+            marginBottom: '1.5rem',
+          }}>
+            <div style={{ display: 'flex', gap: '0.375rem', marginBottom: '1rem', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border)' }}>
+              {['H1','H2','B','I','—'].map(t => (
+                <div key={t} style={{
+                  width: t === '—' ? '32px' : '24px',
+                  height: '24px',
+                  borderRadius: '0.25rem',
+                  background: 'var(--surface)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '0.5rem',
+                  color: 'var(--text-dim)',
+                  fontFamily: 'DM Mono, monospace',
+                  fontWeight: 600,
+                }}>
+                  {t}
+                </div>
+              ))}
+              <div style={{ flex: 1 }} />
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '0.25rem',
+                padding: '0.2rem 0.5rem', borderRadius: '0.25rem',
+                background: 'var(--accent-dim)', border: '1px solid var(--accent)',
+                fontSize: '0.55rem', fontFamily: 'Syne, sans-serif', color: 'var(--accent-text)', fontWeight: 600,
+              }}>
+                ✦ IA
+              </div>
+            </div>
+            <div style={{ fontFamily: 'Fenix, serif', fontSize: '1rem', color: 'var(--text)', marginBottom: '0.5rem' }}>
+              Tesis de grado — Capítulo 3
+            </div>
+            <div style={{ height: '0.5rem', background: 'var(--border)', borderRadius: '0.25rem', width: '85%', marginBottom: '0.375rem' }} />
+            <div style={{ height: '0.5rem', background: 'var(--border)', borderRadius: '0.25rem', width: '60%', marginBottom: '0.375rem' }} />
+            <div style={{ height: '0.5rem', background: 'var(--border)', borderRadius: '0.25rem', width: '90%', marginBottom: '1rem' }} />
+            <div style={{ height: '0.5rem', background: 'var(--border)', borderRadius: '0.25rem', width: '75%', marginBottom: '0.375rem' }} />
+            <div style={{ height: '0.5rem', background: 'var(--border)', borderRadius: '0.25rem', width: '50%' }} />
+          </div>
+
+          <p className="mono" style={{ fontSize: '0.65rem', color: 'var(--text-dim)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '0.5rem' }}>
+            Exportable como
+          </p>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            {['PDF', 'DOCX', 'APA'].map(f => (
+              <div key={f} style={{
+                padding: '0.25rem 0.625rem',
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
+                borderRadius: '0.375rem',
+                fontFamily: 'DM Mono, monospace',
+                fontSize: '0.6rem',
+                color: 'var(--text-dim)',
+              }}>{f}</div>
+            ))}
+          </div>
         </div>
 
-        <OAuthButtons />
-
-        <div className="flex items-center gap-3 my-6">
-          <div className="flex-1 h-px" style={{ background: 'var(--border)' }} />
-          <span className="text-xs uppercase tracking-wider" style={{ color: 'var(--text-dim)' }}>o con tu email</span>
-          <div className="flex-1 h-px" style={{ background: 'var(--border)' }} />
+        {/* Features */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {[
+            { icon: '✦', label: 'IA genera borradores desde el historial de tu equipo' },
+            { icon: '◈', label: 'Misma cuenta que Strata — sin registro adicional' },
+            { icon: '⟳', label: 'Autoguardado continuo mientras escribes' },
+          ].map(f => (
+            <div key={f.label} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.625rem' }}>
+              <span className="mono" style={{ fontSize: '0.75rem', color: 'var(--accent)', marginTop: '0.05rem', flexShrink: 0 }}>{f.icon}</span>
+              <span style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>{f.label}</span>
+            </div>
+          ))}
         </div>
+      </div>
 
-        <form onSubmit={handleRegister} className="space-y-4">
+      {/* Panel derecho — formulario */}
+      <div style={{
+        flex: 1,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '2rem',
+      }}>
+        <div style={{ width: '100%', maxWidth: '360px' }}>
+          {/* Logo mobile */}
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.1em', marginBottom: '2rem' }}>
+            <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: '1.35rem', color: 'var(--text)', letterSpacing: '-0.02em' }}>
+              Strata
+            </span>
+            <span style={{ fontFamily: 'Fenix, serif', fontSize: '1.35rem', color: 'var(--accent)', letterSpacing: '-0.01em' }}>
+              DOC
+            </span>
+          </div>
+
+          <h1 style={{ fontFamily: 'Fenix, serif', fontSize: '1.5rem', color: 'var(--text)', marginBottom: '0.4rem', lineHeight: 1.15 }}>
+            Crea tu cuenta
+          </h1>
+          <p style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '2rem', lineHeight: 1.5 }}>
+            Si ya tienes cuenta en Strata, entra directamente con OAuth.
+          </p>
+
+          <OAuthButtons />
+
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '0.75rem',
+            margin: '1.5rem 0',
+          }}>
+            <div style={{ flex: 1, height: '1px', background: 'var(--border)' }} />
+            <span className="mono" style={{ fontSize: '0.6rem', color: 'var(--text-dim)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+              o con email
+            </span>
+            <div style={{ flex: 1, height: '1px', background: 'var(--border)' }} />
+          </div>
+
           {error && (
-            <div className="text-sm px-4 py-3 rounded-lg border" style={{color: 'var(--red-text)', borderColor: 'rgba(255,68,68,0.2)', background: 'rgba(255,68,68,0.05)'}}>
+            <div style={{
+              marginBottom: '1rem',
+              padding: '0.75rem 1rem',
+              borderRadius: '0.5rem',
+              background: 'rgba(255,68,68,0.06)',
+              border: '1px solid rgba(255,68,68,0.2)',
+              color: 'var(--red-text)',
+              fontFamily: 'Syne, sans-serif',
+              fontSize: '0.8rem',
+            }}>
               {error}
             </div>
           )}
 
-          {[
-            { key: 'username', label: 'Usuario', placeholder: 'tu_usuario', type: 'text' },
-            { key: 'full_name', label: 'Nombre completo', placeholder: 'Tu nombre', type: 'text' },
-            { key: 'email', label: 'Email', placeholder: 'tu@email.com', type: 'email' },
-            { key: 'password', label: 'Contraseña', placeholder: '••••••••', type: 'password' },
-          ].map(field => (
-            <div key={field.key} className="space-y-1">
-              <label className="text-xs uppercase tracking-wider" style={{color: 'var(--text-muted)'}}>{field.label}</label>
-              <input
-                type={field.type}
-                value={form[field.key as keyof typeof form]}
-                onChange={e => setForm(prev => ({ ...prev, [field.key]: e.target.value }))}
-                placeholder={field.placeholder}
-                required
-                className="w-full px-4 py-3 rounded-lg text-sm outline-none transition-all"
-                style={inputStyle}
-                onFocus={e => e.target.style.borderColor = 'var(--accent)'}
-                onBlur={e => e.target.style.borderColor = 'var(--border)'}
-              />
-            </div>
-          ))}
+          <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {[
+              { key: 'username',  label: 'Usuario',         placeholder: 'tu_usuario',    type: 'text'     },
+              { key: 'full_name', label: 'Nombre completo', placeholder: 'Tu nombre',      type: 'text'     },
+              { key: 'email',     label: 'Email',           placeholder: 'tu@email.com',   type: 'email'    },
+              { key: 'password',  label: 'Contraseña',      placeholder: '••••••••',       type: 'password' },
+            ].map(field => (
+              <div key={field.key}>
+                <label style={{
+                  display: 'block',
+                  fontFamily: 'DM Mono, monospace',
+                  fontSize: '0.6rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.1em',
+                  color: 'var(--text-dim)',
+                  marginBottom: '0.375rem',
+                }}>
+                  {field.label}
+                </label>
+                <input
+                  type={field.type}
+                  value={form[field.key as keyof typeof form]}
+                  onChange={e => setForm(prev => ({ ...prev, [field.key]: e.target.value }))}
+                  placeholder={field.placeholder}
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '0.625rem 0.875rem',
+                    borderRadius: '0.5rem',
+                    background: 'var(--surface)',
+                    border: '1px solid var(--border)',
+                    color: 'var(--text)',
+                    fontFamily: 'Syne, sans-serif',
+                    fontSize: '0.875rem',
+                    outline: 'none',
+                    transition: 'border-color 0.15s',
+                    boxSizing: 'border-box',
+                  }}
+                  onFocus={e => e.target.style.borderColor = 'var(--accent)'}
+                  onBlur={e => e.target.style.borderColor = 'var(--border)'}
+                />
+              </div>
+            ))}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-3 rounded-lg font-semibold text-sm transition-all mt-2"
-            style={{
-              background: loading ? 'var(--border2)' : 'var(--accent)',
-              color: loading ? 'var(--text-muted)' : '#000',
-              cursor: loading ? 'not-allowed' : 'pointer'
-            }}
-          >
-            {loading ? 'Creando cuenta...' : 'Crear cuenta'}
-          </button>
-        </form>
+            <button
+              type="submit"
+              disabled={loading}
+              style={{
+                marginTop: '0.5rem',
+                width: '100%',
+                padding: '0.75rem',
+                borderRadius: '0.625rem',
+                border: 'none',
+                background: loading ? 'var(--border2)' : 'var(--accent)',
+                color: loading ? 'var(--text-muted)' : '#000',
+                fontFamily: 'Syne, sans-serif',
+                fontWeight: 700,
+                fontSize: '0.875rem',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                transition: 'all 0.15s',
+              }}
+            >
+              {loading ? 'Creando cuenta…' : 'Crear cuenta'}
+            </button>
+          </form>
 
-        <p className="text-center text-sm mt-6" style={{color: 'var(--text-muted)'}}>
-          ¿Ya tienes cuenta?{' '}
-          <Link href="/login" style={{color: 'var(--accent)'}} className="hover:underline">
-            Inicia sesión
-          </Link>
-        </p>
+          <p style={{
+            textAlign: 'center',
+            marginTop: '1.5rem',
+            fontFamily: 'Syne, sans-serif',
+            fontSize: '0.78rem',
+            color: 'var(--text-muted)',
+          }}>
+            ¿Ya tienes cuenta?{' '}
+            <Link
+              href="/login"
+              className="hover-underline"
+              style={{ color: 'var(--accent-text)', fontWeight: 600, textDecoration: 'none' }}
+            >
+              Inicia sesión
+            </Link>
+          </p>
+
+          <p style={{
+            textAlign: 'center',
+            marginTop: '1.5rem',
+            fontFamily: 'DM Mono, monospace',
+            fontSize: '0.6rem',
+            color: 'var(--text-dim)',
+          }}>
+            Si ya usas Strata, entra con la misma cuenta.
+          </p>
+        </div>
       </div>
+
+      <style>{`
+        @media (min-width: 768px) {
+          .doc-panel { display: flex !important; }
+        }
+        .hover-underline:hover {
+          text-decoration: underline !important;
+        }
+      `}</style>
     </div>
   )
 }

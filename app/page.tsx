@@ -14,7 +14,7 @@ export default function LandingPage() {
         padding: '0 2rem',
         justifyContent: 'space-between',
         borderBottom: '1px solid var(--border)',
-        background: 'rgba(10,10,10,0.85)',
+        background: 'var(--surface)',
         backdropFilter: 'blur(10px)',
       }}>
         <span style={{
@@ -255,7 +255,16 @@ export default function LandingPage() {
             color: 'var(--text-muted)',
           }}>
             ¿Ya tienes cuenta en{' '}
-            <span style={{ color: 'var(--text)', fontWeight: 600 }}>Strata</span>?
+            <a
+              href={process.env.NEXT_PUBLIC_STRATA_URL || 'https://gestor-tareas-psi-one.vercel.app'}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: 'var(--accent-text)', fontWeight: 600, textDecoration: 'none' }}
+              onMouseEnter={e => (e.currentTarget as HTMLElement).style.textDecoration = 'underline'}
+              onMouseLeave={e => (e.currentTarget as HTMLElement).style.textDecoration = 'none'}
+            >
+              Strata
+            </a>?
             {' '}Es la misma cuenta aquí — no necesitas registrarte de nuevo.
           </p>
         </div>
@@ -274,15 +283,37 @@ export default function LandingPage() {
         <span style={{ fontFamily: 'Fenix, serif', fontSize: '1rem', color: 'var(--text-dim)' }}>
           StrataDOC.
         </span>
-        <span style={{
-          fontFamily: 'DM Mono, monospace',
-          fontSize: '0.6rem',
-          letterSpacing: '0.12em',
-          textTransform: 'uppercase',
-          color: 'var(--text-dim)',
-        }}>
-          Documentación para equipos pequeños
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+          <span style={{
+            fontFamily: 'DM Mono, monospace',
+            fontSize: '0.6rem',
+            letterSpacing: '0.12em',
+            textTransform: 'uppercase',
+            color: 'var(--text-dim)',
+          }}>
+            Documentación para equipos pequeños
+          </span>
+          <a
+            href={process.env.NEXT_PUBLIC_STRATA_URL || 'https://gestor-tareas-psi-one.vercel.app'}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              fontFamily: 'Syne, sans-serif',
+              fontSize: '0.75rem',
+              color: 'var(--text-muted)',
+              textDecoration: 'none',
+              transition: 'color 0.15s',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.3rem',
+              flexShrink: 0,
+            }}
+            onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--accent-text)'}
+            onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'}
+          >
+            ← Ir a Strata
+          </a>
+        </div>
       </footer>
     </div>
   )

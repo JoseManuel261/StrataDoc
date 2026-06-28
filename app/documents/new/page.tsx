@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase-server'
+import type { DocumentTemplate } from '@/lib/types'
 
 interface Props {
   searchParams: Promise<{ project_id?: string; project_name?: string; template?: string }>
@@ -22,8 +23,9 @@ export default async function NewDocumentPage({ searchParams }: Props) {
   const params = await searchParams
   const projectId = params.project_id || null
   const projectName = params.project_name ? decodeURIComponent(params.project_name) : null
-  const template = ['apa', 'scientific', 'free'].includes(params.template || '')
-    ? params.template
+  const validTemplates: DocumentTemplate[] = ['apa', 'scientific', 'free']
+  const template: DocumentTemplate = validTemplates.includes(params.template as DocumentTemplate)
+    ? (params.template as DocumentTemplate)
     : 'free'
 
   // Si viene con project_id, verificamos que el usuario tenga acceso

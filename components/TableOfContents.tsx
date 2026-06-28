@@ -27,7 +27,7 @@ export default function TableOfContents({ editor }: TableOfContentsProps) {
 
     function extractHeadings() {
       const items: Heading[] = []
-      editor!.state.doc.descendants((node, _pos) => {
+      editor!.state.doc.descendants((node) => {
         if (node.type.name === 'heading') {
           const text = node.textContent
           const level = node.attrs.level as number
@@ -59,7 +59,7 @@ export default function TableOfContents({ editor }: TableOfContentsProps) {
   if (headings.length === 0) return null
 
   return (
-    <div style={{
+    <div className="toc-panel" style={{
       width: '200px',
       flexShrink: 0,
       borderRight: '1px solid var(--border)',
