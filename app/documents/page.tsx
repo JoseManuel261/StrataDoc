@@ -1,17 +1,21 @@
 'use client'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { FileText, Trash2, Pencil, ChevronRight, FolderOpen, Plus, Clock, BookOpen } from 'lucide-react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import {
+  FileText, Trash2, Pencil, ChevronRight, Plus,
+  Search, BookOpen, ChevronLeft,
+} from 'lucide-react'
 import { getDocuments, createDocument, deleteDocument, renameDocument } from '@/lib/documents'
 import { useToast } from '@/components/ToastProvider'
 import ConfirmModal from '@/components/ConfirmModal'
+import DocumentSearch from '@/components/DocumentSearch'
 import { TEMPLATE_LABELS } from '@/lib/types'
 import type { DocumentSummary } from '@/lib/types'
 
 const TEMPLATE_COLORS: Record<string, string> = {
-  free: 'var(--accent)',
-  apa: 'var(--blue)',
+  free:       'var(--accent)',
+  apa:        'var(--blue)',
   scientific: '#a855f7',
 }
 
@@ -28,19 +32,40 @@ function timeAgo(iso: string) {
 }
 
 export default function DocumentsPage() {
-  const [docs, setDocs] = useState<DocumentSummary[]>([])
-  const [loading, setLoading] = useState(true)
-  const [creating, setCreating] = useState(false)
+  const [docs, setDocs]           = useState<DocumentSummary[]>([])
+  const [total, setTotal]         = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
+  const [page, setPage]           = useState(1)
+  const [loading, setLoading]     = useState(true)
+  const [creating, setCreating]   = useState(false)
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; title: string } | null>(null)
-  const [deleting, setDeleting] = useState(false)
-  const router = useRouter()
-  const toast = useToast()
+  const [deleting, setDeleting]   = useState(false)
+  const [showSearch, setShowSearch] = useState(false)
+  const router  = useRouter()
+  const toast   = useToast()
 
-  const load = useCallback(async () => {
+  // Ctrl+K / ⌘+K para abrir búsqueda
+  useEffect(() => {
+    function handler(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault()
+        setShowSearch(true)
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
+
+  const load = useCallback(async (p = 1) => {
+    setLoading(true)
     try {
-      setDocs(await getDocuments())
+      const result = await getDocuments({ page: p })
+      setDocs(result.docs)
+      setTotal(result.total)
+      setTotalPages(result.totalPages)
+      setPage(result.page)
     } catch {
       toast.error('No se pudieron cargar los documentos')
     } finally {
@@ -48,7 +73,7 @@ export default function DocumentsPage() {
     }
   }, [toast])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => { load(1) }, [load])
 
   async function handleCreate() {
     setCreating(true)
@@ -67,6 +92,7 @@ export default function DocumentsPage() {
     try {
       await deleteDocument(confirmDelete.id)
       setDocs(prev => prev.filter(d => d.id !== confirmDelete.id))
+      setTotal(t => t - 1)
       toast.success('Documento eliminado')
       setConfirmDelete(null)
     } catch {
@@ -79,227 +105,189 @@ export default function DocumentsPage() {
   async function handleRename(id: string) {
     if (!renameValue.trim()) { setRenamingId(null); return }
     try {
-      await renameDocument(id, renameValue.trim())
+      await renameDocument(id, renameValue)
       setDocs(prev => prev.map(d => d.id === id ? { ...d, title: renameValue.trim() } : d))
-      setRenamingId(null)
-      toast.success('Documento renombrado')
     } catch {
-      toast.error('No se pudo renombrar el documento')
+      toast.error('No se pudo renombrar')
+    } finally {
+      setRenamingId(null)
     }
   }
 
   const recent = docs.slice(0, 3)
-  const rest = docs.slice(3)          // los que NO aparecen en recientes
+  const rest   = docs.slice(3)
 
   return (
-    <div style={{ padding: '2.5rem 2rem', maxWidth: '900px', margin: '0 auto' }}>
+    <div style={{ padding: '2rem', maxWidth: '860px', margin: '0 auto' }}>
 
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: '2.5rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2rem', gap: '1rem', flexWrap: 'wrap' }}>
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
-            <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: 'var(--accent)' }} />
-            <span className="mono" style={{ fontSize: '0.58rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--text-dim)' }}>
-              Mis documentos
-            </span>
-          </div>
-          <h1 style={{ fontFamily: 'Fenix, serif', fontSize: '2rem', color: 'var(--text)', lineHeight: 1.1 }}>
-            Biblioteca de documentos
+          <h1 style={{ fontFamily: 'Fenix, serif', fontSize: '1.75rem', color: 'var(--text)', fontWeight: 400, letterSpacing: '-0.02em', marginBottom: '0.25rem' }}>
+            Mis documentos
           </h1>
-          <p style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.3rem' }}>
-            {docs.length === 0 ? 'Crea tu primer documento' : `${docs.length} documento${docs.length !== 1 ? 's' : ''}`}
+          <p className="mono" style={{ fontSize: '0.6rem', color: 'var(--text-dim)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+            {total > 0 ? `${total} documento${total !== 1 ? 's' : ''}` : 'Sin documentos aún'}
           </p>
         </div>
-        <button
-          onClick={handleCreate}
-          disabled={creating}
-          style={{
-            display: 'flex', alignItems: 'center', gap: '0.375rem',
-            padding: '0.625rem 1.25rem',
-            borderRadius: '0.625rem',
-            background: creating ? 'var(--border2)' : 'var(--accent)',
-            color: creating ? 'var(--text-muted)' : '#000',
-            fontWeight: 700, fontSize: '0.8rem',
-            fontFamily: 'Syne, sans-serif',
-            border: 'none', cursor: creating ? 'not-allowed' : 'pointer',
-            transition: 'all 0.15s',
-          }}
-        >
-          <Plus size={14} />
-          {creating ? 'Creando…' : 'Nuevo documento'}
-        </button>
+
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          {/* Búsqueda */}
+          <button
+            onClick={() => setShowSearch(true)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '0.5rem',
+              padding: '0.5rem 0.875rem',
+              border: '1px solid var(--border)', borderRadius: '0.5rem',
+              background: 'var(--surface)', color: 'var(--text-muted)',
+              fontFamily: 'Syne, sans-serif', fontSize: '0.78rem', cursor: 'pointer',
+              transition: 'all 0.15s',
+            }}
+            onMouseEnter={e => {
+              (e.currentTarget as HTMLElement).style.borderColor = 'var(--border2)'
+              ;(e.currentTarget as HTMLElement).style.color = 'var(--text)'
+            }}
+            onMouseLeave={e => {
+              (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'
+              ;(e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'
+            }}
+          >
+            <Search size={13} />
+            Buscar
+            <kbd className="mono" style={{ fontSize: '0.55rem', padding: '0.1rem 0.3rem', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '0.2rem', color: 'var(--text-dim)' }}>
+              ⌘K
+            </kbd>
+          </button>
+
+          {/* Nuevo */}
+          <button
+            onClick={handleCreate}
+            disabled={creating}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '0.375rem',
+              padding: '0.5rem 1rem',
+              borderRadius: '0.5rem', border: 'none',
+              background: creating ? 'var(--border2)' : 'var(--accent)',
+              color: creating ? 'var(--text-muted)' : '#000',
+              fontFamily: 'Syne, sans-serif', fontSize: '0.8rem', fontWeight: 600,
+              cursor: creating ? 'not-allowed' : 'pointer', transition: 'all 0.15s',
+            }}
+          >
+            <Plus size={14} />
+            {creating ? 'Creando…' : 'Nuevo'}
+          </button>
+        </div>
       </div>
 
-      {/* Estado vacío */}
-      {!loading && docs.length === 0 && (
+      {/* Skeletons */}
+      {loading ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          {[1,2,3].map(i => (
+            <div key={i} style={{ height: '60px', borderRadius: '0.625rem', background: 'var(--surface)', border: '1px solid var(--border)', animation: 'pulse 1.5s ease infinite', opacity: 0.6 }} />
+          ))}
+        </div>
+      ) : docs.length === 0 ? (
+
+        /* Estado vacío */
         <div style={{
-          padding: '5rem 2rem', textAlign: 'center',
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+          justifyContent: 'center', padding: '5rem 2rem', textAlign: 'center',
           border: '1px dashed var(--border)', borderRadius: '1rem',
-          background: 'var(--surface)',
         }}>
-          <div style={{ width: '56px', height: '56px', borderRadius: '1rem', background: 'var(--surface2)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem' }}>
+          <div style={{ width: '56px', height: '56px', borderRadius: '1rem', background: 'var(--surface)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.25rem' }}>
             <BookOpen size={24} style={{ color: 'var(--text-dim)' }} />
           </div>
-          <h2 style={{ fontFamily: 'Fenix, serif', fontSize: '1.2rem', color: 'var(--text)', marginBottom: '0.5rem' }}>
-            Aún no hay documentos
+          <h2 style={{ fontFamily: 'Fenix, serif', fontSize: '1.25rem', color: 'var(--text)', fontWeight: 400, marginBottom: '0.5rem' }}>
+            Tu biblioteca está vacía
           </h2>
-          <p style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1.75rem', maxWidth: '320px', margin: '0 auto 1.75rem', lineHeight: 1.6 }}>
-            Crea tu primer documento y deja que la IA te ayude a redactar informes, tesis y artículos basados en el historial de tus proyectos de Strata.
+          <p style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.85rem', color: 'var(--text-muted)', maxWidth: '320px', lineHeight: 1.6, marginBottom: '1.5rem' }}>
+            Crea tu primer documento y usa la IA para generar un borrador a partir de tus proyectos en Strata.
           </p>
           <button
             onClick={handleCreate}
+            disabled={creating}
             style={{
-              display: 'inline-flex', alignItems: 'center', gap: '0.375rem',
-              padding: '0.7rem 1.75rem', borderRadius: '0.625rem',
+              display: 'flex', alignItems: 'center', gap: '0.5rem',
+              padding: '0.625rem 1.25rem',
+              borderRadius: '0.625rem', border: 'none',
               background: 'var(--accent)', color: '#000',
-              fontWeight: 700, fontSize: '0.85rem',
-              fontFamily: 'Syne, sans-serif', border: 'none', cursor: 'pointer',
+              fontFamily: 'Syne, sans-serif', fontSize: '0.85rem', fontWeight: 700,
+              cursor: 'pointer',
             }}
           >
-            <Plus size={14} /> Crear documento
+            <Plus size={15} /> Crear primer documento
           </button>
         </div>
-      )}
 
-      {/* Skeleton */}
-      {loading && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          {[1, 2, 3].map(i => (
-            <div key={i} className="skeleton" style={{ height: '72px', borderRadius: '0.75rem' }} />
-          ))}
-        </div>
-      )}
-
-      {/* Recientes */}
-      {!loading && docs.length > 0 && (
+      ) : (
         <>
-          <div style={{ marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Clock size={12} style={{ color: 'var(--text-dim)' }} />
-            <span className="mono" style={{ fontSize: '0.58rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-dim)' }}>
-              Recientes
-            </span>
-          </div>
-
-          {/* Grid de recientes — tarjetas más grandes */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '0.75rem', marginBottom: '2rem' }}>
-            {recent.map(doc => (
-              <Link
-                key={doc.id}
-                href={`/documents/${doc.id}`}
-                style={{
-                  display: 'block', padding: '1.25rem',
-                  borderRadius: '0.875rem', border: '1px solid var(--border)',
-                  background: 'var(--surface)', textDecoration: 'none',
-                  transition: 'border-color 0.15s, background 0.15s',
-                }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border2)'; (e.currentTarget as HTMLElement).style.background = 'var(--surface2)' }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'; (e.currentTarget as HTMLElement).style.background = 'var(--surface)' }}
-              >
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '0.875rem' }}>
-                  <div style={{ width: '36px', height: '36px', borderRadius: '0.5rem', background: TEMPLATE_COLORS[doc.template] + '18', border: `1px solid ${TEMPLATE_COLORS[doc.template]}33`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <FileText size={16} style={{ color: TEMPLATE_COLORS[doc.template] }} />
-                  </div>
-                  <span className="mono" style={{ fontSize: '0.55rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text-dim)', background: 'var(--surface2)', padding: '0.2rem 0.4rem', borderRadius: '0.25rem' }}>
-                    {TEMPLATE_LABELS[doc.template]}
-                  </span>
-                </div>
-                <p style={{ fontFamily: 'Fenix, serif', fontSize: '0.95rem', color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: '0.375rem' }}>
-                  {doc.title}
-                </p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-                  {doc.project && (
-                    <>
-                      <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'var(--accent)' }} />
-                      <span className="mono" style={{ fontSize: '0.6rem', color: 'var(--text-dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100px' }}>
-                        {doc.project.name}
-                      </span>
-                    </>
-                  )}
-                  <span className="mono" style={{ fontSize: '0.6rem', color: 'var(--text-dim)', marginLeft: doc.project ? 'auto' : '0' }}>
-                    {timeAgo(doc.updated_at)}
-                  </span>
-                </div>
-              </Link>
-            ))}
-          </div>
-
-          {/* Lista del resto — los que no aparecen en recientes */}
-          {rest.length > 0 && (
-            <>
-              <div style={{ marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <FolderOpen size={12} style={{ color: 'var(--text-dim)' }} />
-                <span className="mono" style={{ fontSize: '0.58rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-dim)' }}>
-                  Todos los documentos
-                </span>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                {rest.map(doc => (
-                  <div key={doc.id} className="doc-row"
-                    style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 0.875rem', borderRadius: '0.625rem', border: '1px solid var(--border)', background: 'var(--surface)', transition: 'border-color 0.15s' }}
-                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border2)'}
-                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'}
-                  >
-                    <div style={{ width: '7px', height: '7px', borderRadius: '50%', flexShrink: 0, background: TEMPLATE_COLORS[doc.template] }} />
-
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      {renamingId === doc.id ? (
-                        <input autoFocus value={renameValue}
-                          onChange={e => setRenameValue(e.target.value)}
-                          onBlur={() => handleRename(doc.id)}
-                          onKeyDown={e => { if (e.key === 'Enter') handleRename(doc.id); if (e.key === 'Escape') setRenamingId(null) }}
-                          style={{ background: 'transparent', border: 'none', borderBottom: '1px solid var(--accent)', color: 'var(--text)', fontFamily: 'Syne, sans-serif', fontSize: '0.875rem', fontWeight: 600, outline: 'none', width: '100%' }}
-                        />
-                      ) : (
-                        <p style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {doc.title}
-                        </p>
-                      )}
-                      <div style={{ display: 'flex', gap: '0.625rem', marginTop: '0.15rem', alignItems: 'center' }}>
-                        <span className="mono" style={{ fontSize: '0.58rem', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                          {TEMPLATE_LABELS[doc.template]}
-                        </span>
-                        {doc.project && (
-                          <span className="mono" style={{ fontSize: '0.58rem', color: 'var(--text-dim)' }}>
-                            · {doc.project.name}
-                          </span>
-                        )}
-                        <span className="mono" style={{ fontSize: '0.58rem', color: 'var(--text-dim)' }}>
-                          · {timeAgo(doc.updated_at)}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', gap: '0.125rem', flexShrink: 0, opacity: 0 }} className="doc-actions">
-                      <button title="Renombrar"
-                        onClick={() => { setRenamingId(doc.id); setRenameValue(doc.title) }}
-                        style={{ padding: '0.375rem', borderRadius: '0.375rem', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-dim)' }}
-                        onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--text)'}
-                        onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-dim)'}>
-                        <Pencil size={12} />
-                      </button>
-                      <button title="Eliminar"
-                        onClick={() => setConfirmDelete({ id: doc.id, title: doc.title })}
-                        style={{ padding: '0.375rem', borderRadius: '0.375rem', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-dim)' }}
-                        onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--red-text)'}
-                        onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-dim)'}>
-                        <Trash2 size={12} />
-                      </button>
-                      <Link href={`/documents/${doc.id}`}
-                        style={{ padding: '0.375rem', borderRadius: '0.375rem', color: 'var(--text-dim)', display: 'flex', alignItems: 'center' }}
-                        onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--accent-text)'}
-                        onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-dim)'}>
-                        <ChevronRight size={13} />
-                      </Link>
-                    </div>
-                  </div>
+          {/* Recientes */}
+          {recent.length > 0 && (
+            <div style={{ marginBottom: '2rem' }}>
+              <SectionLabel icon="◷" label="Recientes" />
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '0.75rem' }}>
+                {recent.map(doc => (
+                  <DocCard
+                    key={doc.id}
+                    doc={doc}
+                    renamingId={renamingId}
+                    renameValue={renameValue}
+                    setRenamingId={setRenamingId}
+                    setRenameValue={setRenameValue}
+                    onRename={handleRename}
+                    onDelete={() => setConfirmDelete({ id: doc.id, title: doc.title })}
+                  />
                 ))}
               </div>
-            </>
+            </div>
+          )}
+
+          {/* Resto */}
+          {rest.length > 0 && (
+            <div>
+              <SectionLabel icon="◫" label="Todos los documentos" />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                {rest.map(doc => (
+                  <DocRow
+                    key={doc.id}
+                    doc={doc}
+                    renamingId={renamingId}
+                    renameValue={renameValue}
+                    setRenamingId={setRenamingId}
+                    setRenameValue={setRenameValue}
+                    onRename={handleRename}
+                    onDelete={() => setConfirmDelete({ id: doc.id, title: doc.title })}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Paginación */}
+          {totalPages > 1 && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', marginTop: '2rem' }}>
+              <button
+                onClick={() => load(page - 1)}
+                disabled={page <= 1}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.5rem 0.875rem', borderRadius: '0.5rem', border: '1px solid var(--border)', background: 'transparent', color: page <= 1 ? 'var(--text-dim)' : 'var(--text-muted)', cursor: page <= 1 ? 'not-allowed' : 'pointer', fontFamily: 'Syne, sans-serif', fontSize: '0.78rem' }}
+              >
+                <ChevronLeft size={13} /> Anterior
+              </button>
+              <span className="mono" style={{ fontSize: '0.65rem', color: 'var(--text-dim)' }}>
+                {page} / {totalPages}
+              </span>
+              <button
+                onClick={() => load(page + 1)}
+                disabled={page >= totalPages}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.5rem 0.875rem', borderRadius: '0.5rem', border: '1px solid var(--border)', background: 'transparent', color: page >= totalPages ? 'var(--text-dim)' : 'var(--text-muted)', cursor: page >= totalPages ? 'not-allowed' : 'pointer', fontFamily: 'Syne, sans-serif', fontSize: '0.78rem' }}
+              >
+                Siguiente <ChevronRight size={13} />
+              </button>
+            </div>
           )}
         </>
       )}
 
-      {/* Confirm delete */}
       {confirmDelete && (
         <ConfirmModal
           message={`¿Eliminar "${confirmDelete.title}"? Esta acción no se puede deshacer.`}
@@ -310,12 +298,122 @@ export default function DocumentsPage() {
         />
       )}
 
+      {showSearch && <DocumentSearch onClose={() => setShowSearch(false)} />}
+
       <style>{`
+        @keyframes pulse { 0%,100%{opacity:.6} 50%{opacity:.3} }
         .doc-row:hover .doc-actions { opacity: 1 !important; }
-        @media (max-width: 640px) {
-          .doc-actions { opacity: 1 !important; }
-        }
+        @media (max-width: 640px) { .doc-actions { opacity: 1 !important; } }
       `}</style>
     </div>
+  )
+}
+
+function SectionLabel({ icon, label }: { icon: string; label: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+      <span className="mono" style={{ fontSize: '0.65rem', color: 'var(--text-dim)' }}>{icon}</span>
+      <span className="mono" style={{ fontSize: '0.58rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-dim)' }}>{label}</span>
+    </div>
+  )
+}
+
+interface DocActionProps {
+  doc: DocumentSummary
+  renamingId: string | null
+  renameValue: string
+  setRenamingId: (id: string | null) => void
+  setRenameValue: (v: string) => void
+  onRename: (id: string) => void
+  onDelete: () => void
+}
+
+function DocCard({ doc, renamingId, renameValue, setRenamingId, setRenameValue, onRename, onDelete }: DocActionProps) {
+  return (
+    <div style={{ position: 'relative', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '0.75rem', padding: '1rem', transition: 'border-color 0.15s', cursor: 'pointer' }}
+      onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border2)'}
+      onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'}
+    >
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '0.625rem' }}>
+        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: TEMPLATE_COLORS[doc.template], marginTop: '0.35rem' }} />
+        <div style={{ display: 'flex', gap: '0.125rem' }}>
+          <IconBtn title="Renombrar" onClick={() => { setRenamingId(doc.id); setRenameValue(doc.title) }}>
+            <Pencil size={11} />
+          </IconBtn>
+          <IconBtn title="Eliminar" onClick={onDelete} danger>
+            <Trash2 size={11} />
+          </IconBtn>
+        </div>
+      </div>
+
+      {renamingId === doc.id ? (
+        <input autoFocus value={renameValue}
+          onChange={e => setRenameValue(e.target.value)}
+          onBlur={() => onRename(doc.id)}
+          onKeyDown={e => { if (e.key === 'Enter') onRename(doc.id); if (e.key === 'Escape') setRenamingId(null) }}
+          style={{ background: 'transparent', border: 'none', borderBottom: '1px solid var(--accent)', color: 'var(--text)', fontFamily: 'Syne, sans-serif', fontSize: '0.9rem', fontWeight: 600, outline: 'none', width: '100%', marginBottom: '0.5rem' }}
+        />
+      ) : (
+        <Link href={`/documents/${doc.id}`} style={{ textDecoration: 'none', display: 'block' }}>
+          <p style={{ fontFamily: 'Fenix, serif', fontSize: '0.95rem', color: 'var(--text)', marginBottom: '0.5rem', lineHeight: 1.3 }}>
+            {doc.title}
+          </p>
+        </Link>
+      )}
+
+      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+        <span className="mono" style={{ fontSize: '0.56rem', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{TEMPLATE_LABELS[doc.template]}</span>
+        {doc.project && <span className="mono" style={{ fontSize: '0.56rem', color: 'var(--text-dim)' }}>· {(doc.project as { name: string }).name}</span>}
+        <span className="mono" style={{ fontSize: '0.56rem', color: 'var(--text-dim)' }}>· {timeAgo(doc.updated_at)}</span>
+      </div>
+    </div>
+  )
+}
+
+function DocRow({ doc, renamingId, renameValue, setRenamingId, setRenameValue, onRename, onDelete }: DocActionProps) {
+  return (
+    <div className="doc-row" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.625rem 0.75rem', borderRadius: '0.5rem', border: '1px solid transparent', transition: 'all 0.1s', cursor: 'default' }}
+      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--surface)'; (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)' }}
+      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.borderColor = 'transparent' }}
+    >
+      <div style={{ width: '7px', height: '7px', borderRadius: '50%', flexShrink: 0, background: TEMPLATE_COLORS[doc.template] }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        {renamingId === doc.id ? (
+          <input autoFocus value={renameValue}
+            onChange={e => setRenameValue(e.target.value)}
+            onBlur={() => onRename(doc.id)}
+            onKeyDown={e => { if (e.key === 'Enter') onRename(doc.id); if (e.key === 'Escape') setRenamingId(null) }}
+            style={{ background: 'transparent', border: 'none', borderBottom: '1px solid var(--accent)', color: 'var(--text)', fontFamily: 'Syne, sans-serif', fontSize: '0.875rem', fontWeight: 600, outline: 'none', width: '100%' }}
+          />
+        ) : (
+          <p style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.title}</p>
+        )}
+        <div style={{ display: 'flex', gap: '0.625rem', marginTop: '0.1rem' }}>
+          <span className="mono" style={{ fontSize: '0.58rem', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{TEMPLATE_LABELS[doc.template]}</span>
+          {doc.project && <span className="mono" style={{ fontSize: '0.58rem', color: 'var(--text-dim)' }}>· {(doc.project as { name: string }).name}</span>}
+          <span className="mono" style={{ fontSize: '0.58rem', color: 'var(--text-dim)' }}>· {timeAgo(doc.updated_at)}</span>
+        </div>
+      </div>
+      <div className="doc-actions" style={{ display: 'flex', gap: '0.125rem', flexShrink: 0, opacity: 0, transition: 'opacity 0.15s' }}>
+        <IconBtn title="Renombrar" onClick={() => { setRenamingId(doc.id); setRenameValue(doc.title) }}><Pencil size={12} /></IconBtn>
+        <IconBtn title="Eliminar" onClick={onDelete} danger><Trash2 size={12} /></IconBtn>
+        <Link href={`/documents/${doc.id}`} style={{ padding: '0.375rem', borderRadius: '0.375rem', color: 'var(--text-dim)', display: 'flex', alignItems: 'center' }}
+          onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--accent-text)'}
+          onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-dim)'}>
+          <ChevronRight size={13} />
+        </Link>
+      </div>
+    </div>
+  )
+}
+
+function IconBtn({ children, title, onClick, danger }: { children: React.ReactNode; title: string; onClick: () => void; danger?: boolean }) {
+  return (
+    <button title={title} onClick={onClick}
+      style={{ padding: '0.375rem', borderRadius: '0.375rem', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-dim)', display: 'flex', alignItems: 'center', transition: 'color 0.1s' }}
+      onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = danger ? 'var(--red-text)' : 'var(--text)'}
+      onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-dim)'}>
+      {children}
+    </button>
   )
 }

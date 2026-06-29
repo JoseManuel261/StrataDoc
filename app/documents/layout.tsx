@@ -3,12 +3,11 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import ThemeToggle from '@/components/ThemeToggle'
 import NetworkToast from '@/components/NetworkToast'
-import { FileText, Plus, LogOut, ExternalLink } from 'lucide-react'
+import { FileText, Plus, LogOut, ExternalLink, Search } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
-
-const STRATA_URL = process.env.NEXT_PUBLIC_STRATA_URL || 'https://gestor-tareas-psi-one.vercel.app'
+import { STRATA_URL } from '@/lib/constants'
 
 export default function DocumentsLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()

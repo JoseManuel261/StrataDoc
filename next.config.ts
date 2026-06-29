@@ -1,7 +1,13 @@
-import type { NextConfig } from "next";
+import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
-  /* config options here */
-};
+  // Límite de cuerpo de request para las rutas de API.
+  // Protege contra payloads excesivamente grandes en /api/ai/* y /api/export.
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '2mb',
+    },
+  },
+}
 
-export default nextConfig;
+export default nextConfig

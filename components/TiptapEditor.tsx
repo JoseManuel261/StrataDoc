@@ -23,6 +23,7 @@ interface TiptapEditorProps {
   project: ProjectSummary | null
   initialContent: Record<string, unknown> | null
   onSaveStatus: (status: 'saved' | 'saving' | 'unsaved') => void
+  onContentChange?: (content: Record<string, unknown>, wordCount: number) => void
 }
 
 // Estilos tipográficos por plantilla — solo afectan el área de edición
@@ -61,6 +62,7 @@ export default function TiptapEditor({
   project,
   initialContent,
   onSaveStatus,
+  onContentChange,
 }: TiptapEditorProps) {
   const [showAI, setShowAI] = useState(false)
   const [showTOC, setShowTOC] = useState(true)
@@ -92,8 +94,10 @@ export default function TiptapEditor({
       saveDebounce.current = setTimeout(async () => {
         try {
           onSaveStatus('saving')
-          const wc = editor.storage.characterCount.words() as number
-          await saveDocumentContent(documentId, editor.getJSON() as Record<string, unknown>, wc)
+          const wc      = editor.storage.characterCount.words() as number
+          const content = editor.getJSON() as Record<string, unknown>
+          await saveDocumentContent(documentId, content, wc)
+          onContentChange?.(content, wc)
           onSaveStatus('saved')
         } catch {
           onSaveStatus('unsaved')
