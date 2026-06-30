@@ -1,7 +1,7 @@
 'use client'
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import {
   FileText, Trash2, Pencil, ChevronRight, Plus,
   Search, BookOpen, ChevronLeft,
@@ -67,11 +67,12 @@ export default function DocumentsPage() {
       setTotalPages(result.totalPages)
       setPage(result.page)
     } catch {
-      toast.error('No se pudieron cargar los documentos')
+      // No llamamos toast aquí para no crear dependencia que causa loop
+      console.error('Error cargando documentos')
     } finally {
       setLoading(false)
     }
-  }, [toast])
+  }, []) // Sin deps — load es estable
 
   useEffect(() => { load(1) }, [load])
 

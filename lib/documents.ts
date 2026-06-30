@@ -36,10 +36,14 @@ export async function getDocuments(
   const from = (page - 1) * DOCS_PAGE_SIZE
   const to   = from + DOCS_PAGE_SIZE - 1
 
+  // No usamos join embebido (project:projects(...)) porque la relación
+  // puede no estar declarada como FK en el schema cache de PostgREST,
+  // lo que produce 400 Bad Request. En su lugar resolvemos los nombres
+  // de proyecto con una segunda query liviana.
   let query = supabase
     .from('documents')
     .select(
-      'id, owner_id, title, template, project_id, word_count, created_at, updated_at, project:projects(id,name)',
+      'id, owner_id, title, template, project_id, word_count, created_at, updated_at',
       { count: 'exact' }
     )
     .order('updated_at', { ascending: false })
@@ -52,15 +56,28 @@ export async function getDocuments(
   const { data, error, count } = await query
   if (error) throw error
 
+  const docs = (data ?? []) as unknown as DocumentSummary[]
+
+  // Resolver nombres de proyecto para los documentos vinculados
+  const projectIds = [...new Set(docs.map(d => d.project_id).filter((id): id is string => !!id))]
+  if (projectIds.length > 0) {
+    const { data: projectsData } = await supabase
+      .from('projects')
+      .select('id, name')
+      .in('id', projectIds)
+
+    const projectMap = new Map((projectsData ?? []).map(p => [p.id, p.name]))
+    for (const doc of docs) {
+      if (doc.project_id && projectMap.has(doc.project_id)) {
+        doc.project = { id: doc.project_id, name: projectMap.get(doc.project_id)! }
+      }
+    }
+  }
+
   const total      = count ?? 0
   const totalPages = Math.max(1, Math.ceil(total / DOCS_PAGE_SIZE))
 
-  return {
-    docs: (data ?? []) as unknown as DocumentSummary[],
-    total,
-    totalPages,
-    page,
-  }
+  return { docs, total, totalPages, page }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
