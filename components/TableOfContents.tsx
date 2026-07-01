@@ -13,10 +13,6 @@ interface TableOfContentsProps {
   editor: Editor | null
 }
 
-// Genera un ID slug simple para anclar headings
-function slugify(text: string, index: number): string {
-  return `heading-${index}-${text.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40)}`
-}
 
 export default function TableOfContents({ editor }: TableOfContentsProps) {
   const [headings, setHeadings] = useState<Heading[]>([])

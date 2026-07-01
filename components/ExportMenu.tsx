@@ -73,12 +73,25 @@ export default function ExportMenu({ documentId, documentTitle, editorRef }: Exp
 
       toast.info?.('Generando PDF…')
 
-      const canvas = await html2canvas(editorEl, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: getComputedStyle(document.documentElement)
-          .getPropertyValue('--bg').trim() || '#0a0a0a',
-      })
+      // Forzar colores claros durante la captura para que el PDF
+      // siempre salga legible sin importar el tema activo.
+      const root = document.documentElement
+      const prevTheme = root.getAttribute('data-theme')
+      root.setAttribute('data-theme', 'light')
+      await new Promise(r => setTimeout(r, 50)) // esperar repintado
+
+      let canvas: HTMLCanvasElement
+      try {
+        canvas = await html2canvas(editorEl, {
+          scale: 2,
+          useCORS: true,
+          backgroundColor: '#ffffff',
+        })
+      } finally {
+        // Restaurar tema original siempre, incluso si html2canvas falla
+        if (prevTheme) root.setAttribute('data-theme', prevTheme)
+        else root.removeAttribute('data-theme')
+      }
 
       const imgData = canvas.toDataURL('image/png')
       const pdf     = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })

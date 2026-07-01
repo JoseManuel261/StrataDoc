@@ -3,6 +3,8 @@ import { createClient } from '@/lib/supabase-server'
 import {
   Document as DocxDocument, Packer, Paragraph, TextRun,
   HeadingLevel, AlignmentType, BorderStyle,
+  Table as DocxTable, TableRow as DocxTableRow, TableCell as DocxTableCell,
+  WidthType, ImageRun,
 } from 'docx'
 import { z } from 'zod'
 
@@ -102,6 +104,81 @@ function tiptapToDocx(node: Record<string, unknown>): Paragraph[] {
           spacing: { before: 240, after: 240 },
         }))
         break
+
+      case 'taskList':
+        content.forEach(item => {
+          const checked = (item.attrs as Record<string, unknown>)?.checked === true
+          const itemContent = ((item.content ?? []) as Record<string, unknown>[])
+          itemContent.forEach(p => {
+            const pContent = ((p.content ?? []) as Record<string, unknown>[])
+            paragraphs.push(new Paragraph({
+              children: [
+                new TextRun({ text: checked ? '☑ ' : '☐ ', font: 'Arial' }),
+                ...getRuns(pContent),
+              ],
+              spacing: { after: 80 },
+            }))
+          })
+        })
+        break
+
+      case 'table': {
+        // Construir tabla DOCX desde nodos Tiptap
+        const rows = (content as Record<string, unknown>[]).map(rowNode => {
+          const cells = ((rowNode.content ?? []) as Record<string, unknown>[]).map(cellNode => {
+            const cellContent = ((cellNode.content ?? []) as Record<string, unknown>[])
+            const isHeader = cellNode.type === 'tableHeader'
+            const cellRuns: TextRun[] = []
+            cellContent.forEach(p => {
+              const pContent = ((p.content ?? []) as Record<string, unknown>[])
+              cellRuns.push(...getRuns(pContent))
+            })
+            return new DocxTableCell({
+              children: [new Paragraph({
+                children: cellRuns.length > 0 ? cellRuns : [new TextRun('')],
+                style: isHeader ? 'Strong' : undefined,
+              })],
+              shading: isHeader ? { fill: '1a1a1a' } : undefined,
+            })
+          })
+          return new DocxTableRow({ children: cells })
+        })
+        const docxTable = new DocxTable({
+          rows,
+          width: { size: 100, type: WidthType.PERCENTAGE },
+        })
+        // DocxTable no es Paragraph pero el tipo de retorno los acepta ambos
+        paragraphs.push(docxTable as unknown as Paragraph)
+        break
+      }
+
+      case 'image': {
+        // Imágenes: solo las que son base64 (las de URL externa requieren fetch)
+        const src = (n.attrs as Record<string, string>)?.src ?? ''
+        if (src.startsWith('data:image/')) {
+          try {
+            const [header, b64] = src.split(',')
+            const ext = (header.match(/image\/(png|jpeg|jpg|gif|webp)/) ?? [])[1] ?? 'png'
+            const imageType = (ext === 'jpeg' ? 'jpg' : ext) as 'png' | 'jpg' | 'gif'
+            const buffer = Buffer.from(b64, 'base64')
+            paragraphs.push(new Paragraph({
+              children: [new ImageRun({
+                data: buffer,
+                transformation: { width: 400, height: 300 },
+                type: imageType,
+              })],
+              spacing: { before: 120, after: 120 },
+            }))
+          } catch { /* ignorar imágenes que no se puedan procesar */ }
+        } else {
+          // URL externa: poner texto descriptivo
+          paragraphs.push(new Paragraph({
+            children: [new TextRun({ text: `[Imagen: ${src}]`, color: '888888', italics: true })],
+            spacing: { after: 80 },
+          }))
+        }
+        break
+      }
 
       default:
         // Nodo no reconocido — lo ignoramos silenciosamente
