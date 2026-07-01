@@ -5,8 +5,8 @@ import { List } from 'lucide-react'
 
 interface Heading {
   level: number
-  text: string
-  id: string
+  text:  string
+  pos:   number   // posición en el documento Tiptap para scroll preciso
 }
 
 interface TableOfContentsProps {
@@ -20,19 +20,24 @@ function slugify(text: string, index: number): string {
 
 export default function TableOfContents({ editor }: TableOfContentsProps) {
   const [headings, setHeadings] = useState<Heading[]>([])
-  const [activeId, setActiveId] = useState<string>('')
+  const [activeId, setActiveId] = useState<number | null>(null)
 
   useEffect(() => {
     if (!editor) return
 
     function extractHeadings() {
       const items: Heading[] = []
-      editor!.state.doc.descendants((node) => {
+      let pos = 0
+      editor!.state.doc.descendants((node, nodePos) => {
         if (node.type.name === 'heading') {
-          const text = node.textContent
-          const level = node.attrs.level as number
-          items.push({ level, text, id: slugify(text, items.length) })
+          items.push({
+            level: node.attrs.level as number,
+            text:  node.textContent,
+            pos:   nodePos,
+          })
         }
+        pos = nodePos
+        return true
       })
       setHeadings(items)
     }
@@ -42,18 +47,13 @@ export default function TableOfContents({ editor }: TableOfContentsProps) {
     return () => { editor.off('update', extractHeadings) }
   }, [editor])
 
-  function scrollToHeading(id: string, text: string) {
-    setActiveId(id)
-    // Busca en el DOM del editor el heading con ese texto y hace scroll
-    const editorEl = document.querySelector('.stratadoc-editor')
-    if (!editorEl) return
-    const allHeadings = editorEl.querySelectorAll('h1, h2, h3')
-    for (const el of allHeadings) {
-      if (el.textContent?.trim() === text.trim()) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-        break
-      }
-    }
+  function scrollToHeading(h: Heading) {
+    setActiveId(h.pos)
+    // Usamos la posición exacta en el doc de Tiptap para navegar
+    // al heading correcto incluso si hay texto duplicado.
+    editor?.commands.setTextSelection(h.pos)
+    const domNode = editor?.view.domAtPos(h.pos + 1)?.node as HTMLElement | null
+    domNode?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
   }
 
   if (headings.length === 0) return null
@@ -79,18 +79,18 @@ export default function TableOfContents({ editor }: TableOfContentsProps) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.125rem' }}>
         {headings.map((h, i) => (
           <button key={i}
-            onClick={() => scrollToHeading(h.id, h.text)}
+            onClick={() => scrollToHeading(h)}
             style={{
               textAlign: 'left',
               padding: `0.25rem ${h.level === 1 ? '0.875rem' : h.level === 2 ? '1.25rem' : '1.625rem'}`,
-              background: activeId === h.id ? 'var(--surface2)' : 'transparent',
+              background: activeId === h.pos ? 'var(--surface2)' : 'transparent',
               border: 'none',
-              borderLeft: activeId === h.id ? '2px solid var(--accent)' : '2px solid transparent',
+              borderLeft: activeId === h.pos ? '2px solid var(--accent)' : '2px solid transparent',
               cursor: 'pointer',
               fontFamily: h.level === 1 ? 'Fenix, serif' : 'Syne, sans-serif',
               fontSize: h.level === 1 ? '0.72rem' : h.level === 2 ? '0.67rem' : '0.62rem',
               fontWeight: h.level === 1 ? 600 : 400,
-              color: activeId === h.id ? 'var(--accent-text)' : 'var(--text-muted)',
+              color: activeId === h.pos ? 'var(--accent-text)' : 'var(--text-muted)',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
@@ -99,13 +99,13 @@ export default function TableOfContents({ editor }: TableOfContentsProps) {
               width: '100%',
             }}
             onMouseEnter={e => {
-              if (activeId !== h.id) {
+              if (activeId !== h.pos) {
                 (e.currentTarget as HTMLElement).style.color = 'var(--text)'
                 ;(e.currentTarget as HTMLElement).style.background = 'var(--surface2)'
               }
             }}
             onMouseLeave={e => {
-              if (activeId !== h.id) {
+              if (activeId !== h.pos) {
                 (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'
                 ;(e.currentTarget as HTMLElement).style.background = 'transparent'
               }

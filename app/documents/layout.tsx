@@ -6,13 +6,13 @@ import NetworkToast from '@/components/NetworkToast'
 import { FileText, Plus, LogOut, ExternalLink, Search } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { STRATA_URL } from '@/lib/constants'
 
 export default function DocumentsLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const router = useRouter()
-  const supabase = createClient()
+  const router  = useRouter()
+  const supabase = useMemo(() => createClient(), [])
   const [username, setUsername] = useState<string | null>(null)
 
   useEffect(() => {

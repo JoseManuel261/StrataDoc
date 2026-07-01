@@ -84,6 +84,18 @@ export async function getDocuments(
 // DOCUMENTO INDIVIDUAL
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Valida que el contenido tenga la forma mínima esperada de un doc Tiptap
+ * (objeto con type: 'doc'). Si está corrupto, devuelve null en vez de
+ * dejar pasar basura que tumbaría el editor al montar.
+ */
+function sanitizeContent(raw: unknown): Record<string, unknown> | null {
+  if (!raw || typeof raw !== 'object') return null
+  const obj = raw as Record<string, unknown>
+  if (obj.type !== 'doc' || !Array.isArray(obj.content)) return null
+  return obj
+}
+
 export async function getDocument(id: string): Promise<Document | null> {
   const supabase = createClient()
   const { data, error } = await supabase
@@ -96,7 +108,10 @@ export async function getDocument(id: string): Promise<Document | null> {
     if (error.code === 'PGRST116') return null   // not found
     throw error
   }
-  return data as Document
+
+  const doc = data as Document
+  doc.content = sanitizeContent(doc.content)
+  return doc
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

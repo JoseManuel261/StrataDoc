@@ -6,6 +6,7 @@ import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import ThemeToggle from '@/components/ThemeToggle'
 import ExportMenu from '@/components/ExportMenu'
+import EditorErrorBoundary from '@/components/EditorErrorBoundary'
 import {
   getDocument, updateDocumentMeta, getAccessibleProjects,
 } from '@/lib/documents'
@@ -218,18 +219,20 @@ export default function DocumentEditorPage() {
 
       {/* Editor + paneles laterales */}
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', minWidth: 0 }}>
-        <TiptapEditor
-          documentId={id}
-          documentTitle={title}
-          template={doc.template}
-          project={activeProject}
-          initialContent={doc.content}
-          onSaveStatus={setSaveStatus}
-          onContentChange={(content, wordCount) => {
-            setCurrentContent(content)
-            setCurrentWordCount(wordCount)
-          }}
-        />
+        <EditorErrorBoundary documentId={id}>
+          <TiptapEditor
+            documentId={id}
+            documentTitle={title}
+            template={doc.template}
+            project={activeProject}
+            initialContent={doc.content}
+            onSaveStatus={setSaveStatus}
+            onContentChange={(content, wordCount) => {
+              setCurrentContent(content)
+              setCurrentWordCount(wordCount)
+            }}
+          />
+        </EditorErrorBoundary>
 
         {showVersions && (
           <VersionHistory

@@ -32,7 +32,9 @@ export async function middleware(request: NextRequest) {
   const isProtected = protectedPrefixes.some(
     p => pathname === p || pathname.startsWith(p + '/')
   )
-  const isAuthPage = pathname === '/login' || pathname === '/register'
+  const isAuthPage = pathname === '/login' || pathname === '/register' || pathname === '/forgot-password'
+  // reset-password se excluye deliberadamente: un usuario puede llegar ahí
+  // con una sesión de recuperación temporal activa, y no debe ser rebotado.
 
   if (!user && isProtected) {
     const loginUrl = new URL('/login', request.url)
@@ -53,5 +55,6 @@ export const config = {
     '/documents/:path*',
     '/login',
     '/register',
+    '/forgot-password',
   ],
 }

@@ -4,11 +4,12 @@ import { History, Tag, Trash2, RotateCcw, Plus, Loader2, ChevronDown } from 'luc
 import { useToast } from '@/components/ToastProvider'
 
 interface Version {
-  id:         string
+  id:          string
   document_id: string
-  word_count: number
-  label:      string | null
-  created_at: string
+  content:     Record<string, unknown> | null
+  word_count:  number
+  label:       string | null
+  created_at:  string
 }
 
 interface VersionHistoryProps {
@@ -87,28 +88,25 @@ export default function VersionHistory({
   }
 
   async function handleRestore(version: Version) {
+    if (!version.content) {
+      toast.error('Esta versión no tiene contenido guardado')
+      return
+    }
     setRestoringId(version.id)
     try {
-      // Cargamos el contenido completo de esta versión
-      const res = await fetch(`/api/versions?documentId=${documentId}`)
-      const data = await res.json()
-      const full = (data.versions ?? []).find((v: Version & { content?: unknown }) => v.id === version.id)
-      
-      // Como la lista no trae content, hacemos un fetch específico
-      const resContent = await fetch('/api/versions', {
+      // Guardar snapshot del estado actual antes de restaurar
+      await fetch('/api/versions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           documentId,
-          content:   currentContent,  // guardamos estado actual antes de restaurar
+          content:   currentContent,
           wordCount: currentWordCount,
-          label:     `Auto-guardado antes de restaurar ${timeAgo(version.created_at)}`,
+          label:     `Respaldo antes de restaurar ${timeAgo(version.created_at)}`,
         }),
       })
-      if (!resContent.ok) throw new Error()
-
-      onRestore(full?.content ?? currentContent)
-      toast.success('Versión restaurada — la actual fue guardada como respaldo')
+      onRestore(version.content)
+      toast.success('Versión restaurada — se guardó un respaldo del estado actual')
       onClose()
     } catch {
       toast.error('No se pudo restaurar la versión')

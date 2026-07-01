@@ -1,16 +1,23 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { createClient } from '@/lib/supabase'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import OAuthButtons from '@/components/OAuthButtons'
 
-export default function LoginPage() {
+function LoginForm() {
   const [form, setForm]     = useState({ email: '', password: '' })
   const [error, setError]   = useState('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
+
+  useEffect(() => {
+    if (searchParams.get('error') === 'oauth') {
+      setError('No se pudo completar el inicio de sesión con el proveedor. Intenta de nuevo.')
+    }
+  }, [searchParams])
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
@@ -119,9 +126,18 @@ export default function LoginPage() {
               { key: 'password', label: 'Contraseña', placeholder: '••••••••',     type: 'password' },
             ].map(field => (
               <div key={field.key}>
-                <label style={{ display: 'block', fontFamily: 'DM Mono, monospace', fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text-dim)', marginBottom: '0.375rem' }}>
-                  {field.label}
-                </label>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.375rem' }}>
+                  <label style={{ fontFamily: 'DM Mono, monospace', fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text-dim)' }}>
+                    {field.label}
+                  </label>
+                  {field.key === 'password' && (
+                    <Link href="/forgot-password" style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.68rem', color: 'var(--text-dim)', textDecoration: 'none' }}
+                      onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--accent-text)'}
+                      onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-dim)'}>
+                      ¿Olvidaste tu contraseña?
+                    </Link>
+                  )}
+                </div>
                 <input
                   type={field.type}
                   value={form[field.key as keyof typeof form]}
@@ -159,5 +175,15 @@ export default function LoginPage() {
         @media (min-width: 768px) { .doc-panel { display: flex !important; } }
       `}</style>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }} />
+    }>
+      <LoginForm />
+    </Suspense>
   )
 }

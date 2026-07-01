@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
 
     const { data, error } = await supabase
       .from('document_versions')
-      .select('id, document_id, word_count, label, created_at')
+      .select('id, document_id, content, word_count, label, created_at')
       .eq('document_id', documentId)
       .order('created_at', { ascending: false })
       .limit(50)

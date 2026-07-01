@@ -3,12 +3,14 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { MailCheck } from 'lucide-react'
 import OAuthButtons from '@/components/OAuthButtons'
 
 export default function RegisterPage() {
   const [form, setForm] = useState({ username: '', full_name: '', email: '', password: '' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [pendingConfirm, setPendingConfirm] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
@@ -16,7 +18,7 @@ export default function RegisterPage() {
     e.preventDefault()
     setLoading(true)
     setError('')
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email: form.email,
       password: form.password,
       options: {
@@ -24,13 +26,50 @@ export default function RegisterPage() {
       }
     })
     if (error) {
-      setError(error.message)
+      setError(
+        error.message.includes('already registered')
+          ? 'Ya existe una cuenta con este email. Inicia sesión.'
+          : error.message
+      )
       setLoading(false)
-    } else {
-      const nextParam = new URLSearchParams(window.location.search).get('next')
-      window.location.href = nextParam && nextParam.startsWith('/') ? nextParam : '/documents'
-      router.refresh()
+      return
     }
+
+    // Si Supabase tiene confirmación de email activada, signUp no devuelve
+    // sesión hasta que el usuario haga clic en el link del correo.
+    // Mostramos una pantalla de "revisa tu correo" en vez de redirigir
+    // a /documents (donde el middleware lo rebotaría de vuelta a /login).
+    if (!data.session) {
+      setPendingConfirm(true)
+      setLoading(false)
+      return
+    }
+
+    const nextParam = new URLSearchParams(window.location.search).get('next')
+    window.location.href = nextParam && nextParam.startsWith('/') ? nextParam : '/documents'
+    router.refresh()
+  }
+
+  if (pendingConfirm) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem', background: 'var(--bg)' }}>
+        <div style={{ width: '100%', maxWidth: '380px', textAlign: 'center' }}>
+          <div style={{ width: '56px', height: '56px', borderRadius: '1rem', background: 'var(--accent-dim)', border: '1px solid var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
+            <MailCheck size={24} style={{ color: 'var(--accent-text)' }} />
+          </div>
+          <h1 style={{ fontFamily: 'Fenix, serif', fontSize: '1.4rem', color: 'var(--text)', marginBottom: '0.75rem' }}>
+            Revisa tu correo
+          </h1>
+          <p style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: '2rem' }}>
+            Enviamos un enlace de confirmación a <strong style={{ color: 'var(--text)' }}>{form.email}</strong>.
+            Haz clic en él para activar tu cuenta y entrar a StrataDOC.
+          </p>
+          <Link href="/login" style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.8rem', color: 'var(--accent-text)', fontWeight: 600, textDecoration: 'none' }}>
+            ← Volver a inicio de sesión
+          </Link>
+        </div>
+      </div>
+    )
   }
 
   return (
