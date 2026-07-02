@@ -122,6 +122,7 @@ export async function createDocument(fields: {
   title?:      string
   template?:   DocumentTemplate
   project_id?: string | null
+  content?:    Record<string, unknown>
 }): Promise<string> {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -134,6 +135,7 @@ export async function createDocument(fields: {
       title:      fields.title ?? 'Sin título',
       template:   fields.template ?? 'free',
       project_id: fields.project_id ?? null,
+      content:    fields.content ?? null,
     })
     .select('id')
     .single()
@@ -212,6 +214,35 @@ export async function deleteDocument(id: string): Promise<void> {
   const supabase = createClient()
   const { error } = await supabase.from('documents').delete().eq('id', id)
   if (error) throw error
+}
+
+export async function duplicateDocument(id: string): Promise<string> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('No autenticado')
+
+  const { data: original, error: fetchErr } = await supabase
+    .from('documents')
+    .select('title, template, project_id, content')
+    .eq('id', id)
+    .single()
+
+  if (fetchErr || !original) throw new Error('Documento no encontrado')
+
+  const { data, error } = await supabase
+    .from('documents')
+    .insert({
+      owner_id:   user.id,
+      title:      `${original.title} (copia)`,
+      template:   original.template,
+      project_id: original.project_id,
+      content:    original.content,
+    })
+    .select('id')
+    .single()
+
+  if (error) throw error
+  return data.id as string
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

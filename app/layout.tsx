@@ -13,6 +13,10 @@ export const metadata: Metadata = {
   description: 'Editor de documentos con IA para equipos. Redacta informes y documentación con asistencia contextual, vinculado a tus proyectos de Strata.',
   keywords: ['editor de documentos', 'documentación con IA', 'informes', 'redacción colaborativa'],
   authors: [{ name: 'StrataDOC' }],
+  icons: {
+    icon: '/favicon.svg',
+    shortcut: '/favicon.svg',
+  },
   openGraph: {
     title: 'StrataDOC — Documentos con IA',
     description: 'Editor de documentos con IA para equipos, vinculado a tus proyectos de Strata.',

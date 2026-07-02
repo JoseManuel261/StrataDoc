@@ -4,9 +4,9 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   FileText, Trash2, Pencil, ChevronRight, Plus,
-  Search, BookOpen, ChevronLeft,
+  Search, BookOpen, ChevronLeft, Copy,
 } from 'lucide-react'
-import { getDocuments, createDocument, deleteDocument, renameDocument } from '@/lib/documents'
+import { getDocuments, createDocument, deleteDocument, renameDocument, duplicateDocument } from '@/lib/documents'
 import { useToast } from '@/components/ToastProvider'
 import ConfirmModal from '@/components/ConfirmModal'
 import DocumentSearch from '@/components/DocumentSearch'
@@ -38,6 +38,7 @@ export default function DocumentsPage() {
   const [page, setPage]           = useState(1)
   const [loading, setLoading]     = useState(true)
   const [creating, setCreating]   = useState(false)
+  const [loadError, setLoadError] = useState(false)
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; title: string } | null>(null)
@@ -67,8 +68,7 @@ export default function DocumentsPage() {
       setTotalPages(result.totalPages)
       setPage(result.page)
     } catch {
-      // No llamamos toast aquí para no crear dependencia que causa loop
-      console.error('Error cargando documentos')
+      setLoadError(true)
     } finally {
       setLoading(false)
     }
@@ -77,13 +77,16 @@ export default function DocumentsPage() {
   useEffect(() => { load(1) }, [load])
 
   async function handleCreate() {
-    setCreating(true)
+    router.push('/documents/new')
+  }
+
+  async function handleDuplicate(id: string, title: string) {
     try {
-      const id = await createDocument({ title: 'Sin título' })
-      router.push(`/documents/${id}`)
+      const newId = await duplicateDocument(id)
+      toast.success(`"${title}" duplicado`)
+      router.push(`/documents/${newId}`)
     } catch {
-      toast.error('No se pudo crear el documento')
-      setCreating(false)
+      toast.error('No se pudo duplicar el documento')
     }
   }
 
@@ -180,8 +183,16 @@ export default function DocumentsPage() {
         </div>
       </div>
 
-      {/* Skeletons */}
-      {loading ? (
+      {loadError ? (
+        <div style={{ padding: '3rem 2rem', textAlign: 'center', border: '1px dashed rgba(255,68,68,0.3)', borderRadius: '1rem' }}>
+          <p style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.85rem', color: 'var(--red-text)', marginBottom: '1rem' }}>
+            No se pudieron cargar los documentos.
+          </p>
+          <button onClick={() => { setLoadError(false); load(1) }} style={{ padding: '0.5rem 1rem', borderRadius: '0.5rem', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-muted)', fontFamily: 'Syne, sans-serif', fontSize: '0.78rem', cursor: 'pointer' }}>
+            Reintentar
+          </button>
+        </div>
+      ) : loading ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           {[1,2,3].map(i => (
             <div key={i} style={{ height: '60px', borderRadius: '0.625rem', background: 'var(--surface)', border: '1px solid var(--border)', animation: 'pulse 1.5s ease infinite', opacity: 0.6 }} />
@@ -237,6 +248,7 @@ export default function DocumentsPage() {
                     setRenameValue={setRenameValue}
                     onRename={handleRename}
                     onDelete={() => setConfirmDelete({ id: doc.id, title: doc.title })}
+                    onDuplicate={() => handleDuplicate(doc.id, doc.title)}
                   />
                 ))}
               </div>
@@ -258,6 +270,7 @@ export default function DocumentsPage() {
                     setRenameValue={setRenameValue}
                     onRename={handleRename}
                     onDelete={() => setConfirmDelete({ id: doc.id, title: doc.title })}
+                    onDuplicate={() => handleDuplicate(doc.id, doc.title)}
                   />
                 ))}
               </div>
@@ -327,9 +340,10 @@ interface DocActionProps {
   setRenameValue: (v: string) => void
   onRename: (id: string) => void
   onDelete: () => void
+  onDuplicate: () => void
 }
 
-function DocCard({ doc, renamingId, renameValue, setRenamingId, setRenameValue, onRename, onDelete }: DocActionProps) {
+function DocCard({ doc, renamingId, renameValue, setRenamingId, setRenameValue, onRename, onDelete, onDuplicate }: DocActionProps) {
   return (
     <div style={{ position: 'relative', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '0.75rem', padding: '1rem', transition: 'border-color 0.15s', cursor: 'pointer' }}
       onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border2)'}
@@ -340,6 +354,9 @@ function DocCard({ doc, renamingId, renameValue, setRenamingId, setRenameValue, 
         <div style={{ display: 'flex', gap: '0.125rem' }}>
           <IconBtn title="Renombrar" onClick={() => { setRenamingId(doc.id); setRenameValue(doc.title) }}>
             <Pencil size={11} />
+          </IconBtn>
+          <IconBtn title="Duplicar" onClick={onDuplicate}>
+            <Copy size={11} />
           </IconBtn>
           <IconBtn title="Eliminar" onClick={onDelete} danger>
             <Trash2 size={11} />
@@ -371,7 +388,7 @@ function DocCard({ doc, renamingId, renameValue, setRenamingId, setRenameValue, 
   )
 }
 
-function DocRow({ doc, renamingId, renameValue, setRenamingId, setRenameValue, onRename, onDelete }: DocActionProps) {
+function DocRow({ doc, renamingId, renameValue, setRenamingId, setRenameValue, onRename, onDelete, onDuplicate }: DocActionProps) {
   return (
     <div className="doc-row" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.625rem 0.75rem', borderRadius: '0.5rem', border: '1px solid transparent', transition: 'all 0.1s', cursor: 'default' }}
       onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--surface)'; (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)' }}
@@ -397,6 +414,7 @@ function DocRow({ doc, renamingId, renameValue, setRenamingId, setRenameValue, o
       </div>
       <div className="doc-actions" style={{ display: 'flex', gap: '0.125rem', flexShrink: 0, opacity: 0, transition: 'opacity 0.15s' }}>
         <IconBtn title="Renombrar" onClick={() => { setRenamingId(doc.id); setRenameValue(doc.title) }}><Pencil size={12} /></IconBtn>
+        <IconBtn title="Duplicar" onClick={onDuplicate}><Copy size={12} /></IconBtn>
         <IconBtn title="Eliminar" onClick={onDelete} danger><Trash2 size={12} /></IconBtn>
         <Link href={`/documents/${doc.id}`} style={{ padding: '0.375rem', borderRadius: '0.375rem', color: 'var(--text-dim)', display: 'flex', alignItems: 'center' }}
           onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--accent-text)'}

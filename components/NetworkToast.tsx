@@ -1,13 +1,19 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { WifiOff } from 'lucide-react'
+import { WifiOff, Wifi } from 'lucide-react'
 
 export default function NetworkToast() {
-  const [offline, setOffline] = useState(false)
+  const [status, setStatus] = useState<'online' | 'offline' | null>(null)
+  const [visible, setVisible] = useState(false)
 
   useEffect(() => {
-    const onOffline = () => setOffline(true)
-    const onOnline  = () => setOffline(false)
+    function onOffline() { setStatus('offline'); setVisible(true) }
+    function onOnline()  {
+      setStatus('online')
+      setVisible(true)
+      // Ocultar el toast de "reconectado" después de 3s
+      setTimeout(() => setVisible(false), 3000)
+    }
     window.addEventListener('offline', onOffline)
     window.addEventListener('online',  onOnline)
     return () => {
@@ -16,17 +22,43 @@ export default function NetworkToast() {
     }
   }, [])
 
-  if (!offline) return null
+  if (!visible || !status) return null
+
+  const isOffline = status === 'offline'
 
   return (
-    <div className="toast-slide fixed bottom-6 left-1/2 -translate-x-1/2 z-[10001] flex items-center gap-2.5 px-4 py-3 rounded-xl"
-      style={{
-        background: 'var(--surface)',
-        border: '1px solid rgba(255,68,68,0.4)',
-        boxShadow: '0 8px 28px rgba(0,0,0,0.4)',
-      }}>
-      <WifiOff size={14} style={{ color: 'var(--red-text)' }} />
-      <span className="text-sm" style={{ color: 'var(--text)' }}>Sin conexión — los cambios se reanudarán al reconectarte</span>
+    <div style={{
+      position: 'fixed',
+      bottom: '1.5rem',
+      left: '50%',
+      transform: 'translateX(-50%)',
+      zIndex: 10001,
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.625rem',
+      padding: '0.75rem 1rem',
+      borderRadius: '0.75rem',
+      background: 'var(--surface)',
+      border: `1px solid ${isOffline ? 'rgba(255,68,68,0.4)' : 'rgba(200,240,74,0.4)'}`,
+      boxShadow: '0 8px 28px rgba(0,0,0,0.4)',
+      animation: 'slideUp 0.2s ease',
+    }}>
+      {isOffline
+        ? <WifiOff  size={14} style={{ color: 'var(--red-text)', flexShrink: 0 }} />
+        : <Wifi     size={14} style={{ color: 'var(--accent-text)', flexShrink: 0 }} />
+      }
+      <span style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.8rem', color: 'var(--text)', whiteSpace: 'nowrap' }}>
+        {isOffline
+          ? 'Sin conexión — los cambios se reanudarán al reconectarte'
+          : 'Conexión restaurada'
+        }
+      </span>
+      {isOffline && (
+        <button onClick={() => setVisible(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)', marginLeft: '0.25rem', padding: '0.1rem', lineHeight: 1 }}>
+          ×
+        </button>
+      )}
+      <style>{`@keyframes slideUp { from { opacity: 0; transform: translateX(-50%) translateY(8px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }`}</style>
     </div>
   )
 }
