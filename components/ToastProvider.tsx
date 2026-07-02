@@ -5,29 +5,35 @@ import { CheckCircle2, XCircle, Info, X } from 'lucide-react'
 type ToastType = 'success' | 'error' | 'info'
 
 interface Toast {
-  id: string
-  type: ToastType
+  id:      string
+  type:    ToastType
   message: string
 }
 
 interface ToastContextType {
   success: (message: string) => void
-  error: (message: string) => void
-  info: (message: string) => void
+  error:   (message: string) => void
+  info?:   (message: string) => void
 }
 
 const ToastContext = createContext<ToastContextType | null>(null)
 
 const ICONS: Record<ToastType, React.ElementType> = {
   success: CheckCircle2,
-  error: XCircle,
-  info: Info,
+  error:   XCircle,
+  info:    Info,
 }
 
-const COLORS: Record<ToastType, string> = {
+const BORDER_COLORS: Record<ToastType, string> = {
+  success: 'rgba(200,240,74,0.35)',
+  error:   'rgba(255,68,68,0.35)',
+  info:    'rgba(96,165,250,0.35)',
+}
+
+const ICON_COLORS: Record<ToastType, string> = {
   success: 'var(--accent)',
-  error: 'var(--red)',
-  info: 'var(--blue)',
+  error:   'var(--red-text)',
+  info:    'var(--blue)',
 }
 
 export function ToastProvider({ children }: { children: ReactNode }) {
@@ -45,34 +51,73 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const value: ToastContextType = {
     success: (m: string) => push('success', m),
-    error: (m: string) => push('error', m),
-    info: (m: string) => push('info', m),
+    error:   (m: string) => push('error',   m),
+    info:    (m: string) => push('info',    m),
   }
 
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] flex flex-col gap-2 items-center w-full px-4 pointer-events-none">
+
+      {/* Contenedor de toasts — 100% inline styles, sin Tailwind */}
+      <div style={{
+        position: 'fixed',
+        bottom: '1.5rem',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        zIndex: 20000,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.5rem',
+        alignItems: 'center',
+        width: '100%',
+        maxWidth: '420px',
+        padding: '0 1rem',
+        pointerEvents: 'none',
+        boxSizing: 'border-box',
+      }}>
         {toasts.map(t => {
-          const Icon = ICONS[t.type]
-          const color = COLORS[t.type]
+          const Icon  = ICONS[t.type]
+          const borderColor = BORDER_COLORS[t.type]
+          const iconColor   = ICON_COLORS[t.type]
           return (
-            <div key={t.id}
-              className="toast-slide flex items-center gap-2.5 px-4 py-3 rounded-xl pointer-events-auto max-w-sm"
-              style={{
-                background: 'var(--surface)',
-                border: `1px solid ${color}55`,
-                boxShadow: '0 8px 28px rgba(0,0,0,0.4)',
-              }}>
-              <Icon size={16} style={{ color }} className="shrink-0"/>
-              <span className="text-sm flex-1" style={{ color: 'var(--text)' }}>{t.message}</span>
-              <button onClick={() => dismiss(t.id)} className="shrink-0" style={{ color: 'var(--text-dim)' }}>
-                <X size={13}/>
+            <div key={t.id} style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.625rem',
+              padding: '0.75rem 1rem',
+              borderRadius: '0.75rem',
+              pointerEvents: 'auto',
+              width: '100%',
+              background: 'var(--surface)',
+              border: `1px solid ${borderColor}`,
+              boxShadow: '0 8px 28px rgba(0,0,0,0.45)',
+              animation: 'toastSlideUp 0.2s ease',
+            }}>
+              <Icon size={15} style={{ color: iconColor, flexShrink: 0 }} />
+              <span style={{ flex: 1, fontFamily: 'Syne, sans-serif', fontSize: '0.825rem', color: 'var(--text)', lineHeight: 1.45 }}>
+                {t.message}
+              </span>
+              <button onClick={() => dismiss(t.id)} style={{
+                flexShrink: 0, background: 'none', border: 'none',
+                cursor: 'pointer', color: 'var(--text-dim)', display: 'flex',
+                padding: '0.15rem', transition: 'color 0.1s',
+              }}
+              onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--text)'}
+              onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-dim)'}>
+                <X size={13} />
               </button>
             </div>
           )
         })}
       </div>
+
+      <style>{`
+        @keyframes toastSlideUp {
+          from { opacity: 0; transform: translateY(8px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </ToastContext.Provider>
   )
 }
